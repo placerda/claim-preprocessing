@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+
+// approch 01 (preprocess_01.py)
+// "-i", "data/inputs/pdf/75804395-1-18484096.pdf",
+// "-t", "templates/nucc-claim-form-no-border.jpg"
+
+// approach 02 (preprocess_02.py)
+// "-i", "data/inputs/pdf/75804395-1-18484096.pdf",                
+// "-t", "templates/nucc-claim-form-no-border.jpg",
+// "-l", "templates/labels-mask.jpg",
+// "-v", "templates/values-mask.jpg"
+]
+        }
+    ]
+}
