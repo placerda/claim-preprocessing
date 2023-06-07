@@ -1,23 +1,17 @@
 # Insurance Claim Preprocessing
 
-Health Insurance Claim Forms preprocessing to extract form values with Form Recognizer.
+Preprocessing experimentations with Health Insurance Claim Forms template to improve data extraction using Form Recognizer.
 
-Two approaches:
+[General Notes](./Notes.md)
 
-**preprocess_01.py**
+**process.py**
 
-- Align document to template [Reference](https://pyimagesearch.com/2020/08/31/image-alignment-and-registration-with-opencv/)
-- Shift values down 
-- Remove vertical lines (needs improvement)
-- Run FormRec document analysis
+- Align document to template
+- Apply masks to keep only the field labels and values
+- Remove template's background from final image
+- Add table frame
+- Run FR layout or custom model analysis
 
-**preprocess_02.py**
+**References**
 
-- Align document to template [Reference](https://pyimagesearch.com/2020/08/31/image-alignment-and-registration-with-opencv/)
-- Apply masks to keep only the labels and values in the document
-- Run FormRec document analysis
-
-**TODO**
-
-TODO 1: Test and work on the alignment dependency on input width.
-TODO 2: Improve separators removal.
+[Image alignment and registration with OpenCV](https://pyimagesearch.com/2020/08/31/image-alignment-and-registration-with-opencv/)

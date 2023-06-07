@@ -13,15 +13,28 @@
             "justMyCode": true,
             "args": [
 
-// approch 01 (preprocess_01.py)
-// "-i", "data/inputs/pdf/75804395-1-18484096.pdf",
+// approach 01 (preprocess_01.py)
+// "-i", "data/inputs/pdf/18873018_A.pdf",
 // "-t", "templates/nucc-claim-form-no-border.jpg"
+// "-k", "0.3"
 
 // approach 02 (preprocess_02.py)
-// "-i", "data/inputs/pdf/75804395-1-18484096.pdf",                
+// "-i", "data/inputs/pdf/75804395-1-18484096.pdf",
 // "-t", "templates/nucc-claim-form-no-border.jpg",
-// "-l", "templates/labels-mask.jpg",
-// "-v", "templates/values-mask.jpg"
+// "-l", "templates/02-labels-mask.jpg",
+// "-v", "templates/02-values-mask.jpg",
+// "-k", "0.3"
+
+// approach 03 (preprocess_03.py)
+// "-i", "data/inputs/pdf/75804395-1-18484096.pdf",
+// "-i", "data/inputs/pdf/Left Justified Charges_5.pdf",
+"-i", "data/inputs/pdf/18858435_A.pdf",
+// "-i", "data/inputs/pdf/Left Justified Charges_6.pdf",
+"-t", "templates/nucc-claim-form-no-border.jpg",
+"-l", "templates/03-labels-mask.jpg",
+"-v", "templates/03-values-mask.jpg",
+"-b", "templates/03-tables-frame.jpg",
+"-k", "0.3"
 ]
         }
     ]

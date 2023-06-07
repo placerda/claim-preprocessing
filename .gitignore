@@ -1,8 +1,9 @@
 # custom files
 data/
 local/
-work/
+work*/
 launch.json
+.vscode/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
