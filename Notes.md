@@ -24,6 +24,6 @@ H3) Improve P1 and P2 by aligning document to nucc template then keep elements i
 
 **General Comments:**
 
-C1) Alignemnt is good but is not at 100%.
+C1) Alignemnt is good but is not working in all cases.
 
 C2) Need to investigate further the impact of the 'keep percentage' parameter on the results.

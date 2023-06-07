@@ -2,7 +2,6 @@
 #   IMPORTS
 # -----------------------------
 # Import the necessary packages
-import azure.ai.vision as sdk
 from azure.core.credentials import AzureKeyCredential
 from azure.ai.formrecognizer import DocumentAnalysisClient
 import os
@@ -68,84 +67,3 @@ def get_document_words(document_path):
                 int(word.polygon[2].y - word.polygon[0].y))
         result.append(bbox)
     return result
-
-### Computer Vision Service functions
-
-QR_CODE_MODEL_NAME = "qrcode01"
-SEPARATORS_MODEL_NAME = "separators04"
-
-def crop_from_qrcode(input_image: str):
-    """
-    Crops an image to the bounding box and bellow of a QR code detected in the image using Computer Vision service.
-
-    Args:
-        input_image (str): The path to the input image file.
-
-    Returns:
-        Optional[np.ndarray]: The cropped image as a NumPy array, or None if no QR code was found.
-    """
-    service_options = sdk.VisionServiceOptions(os.environ["VISION_ENDPOINT"], os.environ["VISION_KEY"])
-    vision_source = sdk.VisionSource(filename=input_image)
-    analysis_options = sdk.ImageAnalysisOptions()
-    analysis_options.model_name = QR_CODE_MODEL_NAME
-
-    # do the analysis
-    image_analyzer = sdk.ImageAnalyzer(service_options, vision_source, analysis_options)
-    result = image_analyzer.analyze()
-
-    if result.reason == sdk.ImageAnalysisResultReason.ANALYZED:
-        if result.custom_objects is not None:
-            for object in result.custom_objects:
-                if object.confidence > 0.8 and object.name == "qrcode":
-                    print("[INFO] found '{}', {} Confidence: {:.4f}".format(object.name, object.bounding_box, object.confidence))
-                    image = cv2.imread(input_image)
-                    y = object.bounding_box.y
-                    height, width = image.shape[:2]
-                    cropped_image = image[y:height, :]
-                    return cropped_image
-        else:
-            error_details = sdk.ImageAnalysisErrorDetails.from_result(result)
-            print("[ERROR] Analysis failed.")
-            print("            Error reason: {}".format(error_details.reason))
-            print("            Error code: {}".format(error_details.error_code))
-            print("            Error message: {}".format(error_details.message))
-
-def remove_separators(image_path):
-    """
-    Removes any horizontal or vertical separators from an image using Computer Vision service.
-
-    Args:
-        image_path (str): The path to the input image file.
-
-    Returns:
-        Image: The modified image with separators removed.
-    """
-    service_options = sdk.VisionServiceOptions(os.environ["VISION_ENDPOINT"], os.environ["VISION_KEY"])
-    vision_source = sdk.VisionSource(filename=image_path)
-    analysis_options = sdk.ImageAnalysisOptions()
-    analysis_options.model_name = SEPARATORS_MODEL_NAME
-    
-    # do the analysis
-    image_analyzer = sdk.ImageAnalyzer(service_options, vision_source, analysis_options)
-    result = image_analyzer.analyze()
-    result_image = cv2.imread(image_path)
-    
-    if result.reason == sdk.ImageAnalysisResultReason.ANALYZED:
-        if result.custom_objects is not None:
-            for object in result.custom_objects:
-                if object.confidence > 0.2 and object.name == "separator":
-                    print("[INFO] found '{}', {} Confidence: {:.4f}".format(object.name, object.bounding_box, object.confidence))
-                    x0 = object.bounding_box.x
-                    y0 = object.bounding_box.y
-                    x1 = object.bounding_box.x + object.bounding_box.w
-                    y1 = object.bounding_box.x + object.bounding_box.h
-                    cv2.rectangle(result_image, (x0,y0), (x1,y1), (255, 255, 255), -1)
-
-        else:
-            error_details = sdk.ImageAnalysisErrorDetails.from_result(result)
-            print("[ERROR] Analysis failed.")
-            print("            Error reason: {}".format(error_details.reason))
-            print("            Error code: {}".format(error_details.error_code))
-            print("            Error message: {}".format(error_details.message))
-
-    return result_image
