@@ -52,9 +52,9 @@ def main(args):
     # 01. Align image with template (try it n times)
     
     # find best parameter:
-    n = 5
+    n = 1
     iou_threshold = 0.4
-    keep_percentage = 0.1
+    keep_percentage = 0.3
     increment = 0.1
     best_keep_percentage = 0
     best_iou = 0
@@ -124,8 +124,7 @@ def main(args):
     # labels mask
     template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
     masked = np.where(labels_mask < 255, template_gray, masked)
-    # masked = cv2.threshold(masked, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]  # Experimental convert to black and white 
-    
+
     # 04. Add Table frame
     tables_light = np.where(tables_frame < 255, 225, 255)
     masked = np.where(tables_frame <255, tables_light, masked)
@@ -136,18 +135,26 @@ def main(args):
 
     # 05. Duplicate charges row to force FR read it as a table
     print("[INFO] 05. Duplicating charges row...")
+    
+    # get roi
     output = masked.copy()
     x1, y1, x2, y2 = 100, 1755, 1588, 1822 # charges row area
     h = y2 - y1
     w = x2 - x1
     charges_row_roi = masked[y1:y1+h, x1:x1+w]
-    # output[y1:y1+h, x1:x1+w] = 255
-    pixels_to_shift_down = 58
-    output[y1+pixels_to_shift_down:y1+pixels_to_shift_down+h, x1:x1+w] = charges_row_roi
-    # pixels_to_shift_down = 116
-    # output[y1+pixels_to_shift_down:y1+pixels_to_shift_down+h, x1:x1+w] = charges_row_roi
+    
+    # clear original charges row
+    output[y1:y1+h, x1:x1+w] = 255 
+    
+    shift_down_pixels = 58
+    # first shift
+    shift_down = 2 * shift_down_pixels
+    output[y1+shift_down:y1+shift_down+h, x1:x1+w] = charges_row_roi
+    # second shift (right below the first one)
+    shift_down = 3 * shift_down_pixels
+    output[y1+shift_down:y1+shift_down+h, x1:x1+w] = charges_row_roi
 
-    # write output image
+    # write final output image
     output_filename = get_filename(timestamp, "output" )
     cv2.imwrite(output_filename, output)
     print(f"[INFO] Output image: {output_filename}")
@@ -162,12 +169,13 @@ def main(args):
 
     result = {}
 
+    # 07. Navigate and extract data from tables
+
     # birth date
     result['birth_date'] = f"{tables[0][1]['content']} {tables[0][2]['content']} {tables[0][3]['content']}"
 
     # items table
     result['items'] = {}
-    found_charges_row = False
     for cell in tables[1]:
         key = 'row_' + str(cell['row']).zfill(2)
         if cell['row'] in (3, 5, 7, 9, 11, 13):
@@ -186,21 +194,11 @@ def main(args):
             elif cell['column'] == 7: result['items'][key]['charges'] = cell['content']
             elif cell['column'] == 8: result['items'][key]['units'] = cell['content']
             elif cell['column'] == 11: result['items'][key]['provider_id'] = cell['content']
-        elif cell['row'] == 15:
-            found_charges_row = True
-            if result['items'].get(key) is None: result['items'][key] = {} # fist time needs to initialize the dict 
-            if cell['column'] == 0: result['tax_id'] = cell['content']
-            elif cell['column'] == 4: result['account_number'] = cell['content']
-            elif cell['column'] == 7: result['total_charge'] = cell['content']
-            elif cell['column'] == 8: result['total_charge'] = (result['total_charge'] + ' ' + cell['content']).strip()
-            elif cell['column'] == 10: result['amount_paid'] = cell['content']            
-            elif cell['column'] == 11: result['amount_paid'] = (result['amount_paid'] + ' ' + cell['content']).strip()
-            
+
     # charge table (if exists)
-    if not found_charges_row and len(tables) > 2:
+    if len(tables) > 2:
         for cell in tables[2]:
             if cell['row'] == 0:
-                found_charges_row = True
                 if cell['column'] == 0: result['tax_id'] = cell['content']
                 elif cell['column'] == 1: result['account_number'] = cell['content']
                 elif cell['column'] == 2: result['total_charge'] = cell['content']
