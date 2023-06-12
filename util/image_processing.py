@@ -4,7 +4,6 @@
 # Import the necessary packages
 import cv2
 import numpy as np
-import math
 
 # -----------------------------
 #   FUNCTIONS
@@ -92,8 +91,6 @@ def remove_vertical_lines(image, words):
             cv2.drawContours(result_debug, [c], -1, (36,255,12), 2)
             cv2.drawContours(result, [c], -1, (255,255,255), 2)
     return result, result_debug
-
-
 
 def fill_small_holes(img):
     # Convert image to grayscale

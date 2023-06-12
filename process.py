@@ -3,7 +3,7 @@
 # -----------------------------
 #   USAGE
 # -----------------------------
-# python preprocessing_03.py --labels_mask labels_mask.jpg --values_mask values_mask.jpg --tables_frame tables_frame.jpg --template template.jpg --image image.jpg --keep_percent 0.3
+# python preprocessing_03.py --labels_mask labels_mask.jpg --values_mask values_mask.jpg --tables_frame tables_frame.jpg --template template.jpg --image image.jpg
 
 # -----------------------------
 #   IMPORTS
@@ -19,6 +19,7 @@ from util.general_utilities import load_image, get_filename
 from util.image_alignment import align
 from util.image_processing import remove_template
 from util.image_analysis import get_document_tables
+from util.post_processing import extract_data_from_tables
 
 # load environment variables
 dotenv.load_dotenv()
@@ -37,9 +38,25 @@ def calculate_iou(region1, region2):
 
     return iou
 
+def remove_horizontal_lines(gray):
+
+    gray = cv2.convertScaleAbs(gray)
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # Remove horizontal lines
+    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (10,1))
+    detected_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
+    cnts = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+    for c in cnts:
+        cv2.drawContours(gray, [c], -1, 255, 3)
+
+    return gray
+
 def main(args):
     print(f"[INFO] Starting script.")
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S") # timestamp prefix
+
     print("[INFO] Loading and resizing images...")
     image = load_image(args["image"], timestamp, prefix='input')
     template = load_image(args["template"], timestamp, prefix='template' )    
@@ -52,9 +69,9 @@ def main(args):
     # 01. Align image with template (try it n times)
     
     # find best parameter:
-    n = 1
+    n = 6
     iou_threshold = 0.4
-    keep_percentage = 0.3
+    keep_percentage = 0.1
     increment = 0.1
     best_keep_percentage = 0
     best_iou = 0
@@ -154,6 +171,8 @@ def main(args):
     shift_down = 3 * shift_down_pixels
     output[y1+shift_down:y1+shift_down+h, x1:x1+w] = charges_row_roi
 
+    output = remove_horizontal_lines(output)
+
     # write final output image
     output_filename = get_filename(timestamp, "output" )
     cv2.imwrite(output_filename, output)
@@ -167,50 +186,15 @@ def main(args):
 
     ## POSTPROCESSING
 
-    result = {}
-
     # 07. Navigate and extract data from tables
-
-    # birth date
-    result['birth_date'] = f"{tables[0][1]['content']} {tables[0][2]['content']} {tables[0][3]['content']}"
-
-    # items table
-    result['items'] = {}
-    for cell in tables[1]:
-        key = 'row_' + str(cell['row']).zfill(2)
-        if cell['row'] in (3, 5, 7, 9, 11, 13):
-            if result['items'].get(key) is None: result['items'][key] = {} # fist time needs to initialize the dict             
-            if cell['column'] == 0: result['items'][key]['code'] = cell['content']
-            elif cell['column'] == 11: result['items'][key]['provider_id'] = cell['content']            
-        elif cell['row'] in (4, 6, 8, 10, 12, 14):
-            if result['items'].get(key) is None: result['items'][key] = {} # fist time needs to initialize the dict 
-            if cell['column'] == 0: result['items'][key]['date_from'] = cell['content']
-            elif cell['column'] == 1: result['items'][key]['date_to'] = cell['content']
-            elif cell['column'] == 2: result['items'][key]['place_of_service'] = cell['content']
-            elif cell['column'] == 3: result['items'][key]['emg'] = cell['content']            
-            elif cell['column'] == 4: result['items'][key]['cpt'] = cell['content']
-            elif cell['column'] == 5: result['items'][key]['modifier'] = cell['content']            
-            elif cell['column'] == 6: result['items'][key]['diagnosis'] = cell['content']
-            elif cell['column'] == 7: result['items'][key]['charges'] = cell['content']
-            elif cell['column'] == 8: result['items'][key]['units'] = cell['content']
-            elif cell['column'] == 11: result['items'][key]['provider_id'] = cell['content']
-
-    # charge table (if exists)
-    if len(tables) > 2:
-        for cell in tables[2]:
-            if cell['row'] == 0:
-                if cell['column'] == 0: result['tax_id'] = cell['content']
-                elif cell['column'] == 1: result['account_number'] = cell['content']
-                elif cell['column'] == 2: result['total_charge'] = cell['content']
-                elif cell['column'] == 3: result['amount_paid'] = cell['content']            
-
+    print("[INFO] 07. Navigate and extract data from tables...")
+    result = extract_data_from_tables(tables)
     output_text_filename = get_filename(timestamp, "output", extension="json" )
     with open(output_text_filename, "w") as f:
         json.dump(result, f, indent=4)
     print(f"[INFO] Output saved to {output_text_filename}")
 
     print("[INFO] Done")
-
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

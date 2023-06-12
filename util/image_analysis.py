@@ -7,11 +7,9 @@ from azure.ai.formrecognizer import DocumentAnalysisClient
 import os
 import cv2
 
-
 # -----------------------------
 #   FUNCTIONS
 # -----------------------------
-
 
 ### Form Recognize Service functions
 
