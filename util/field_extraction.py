@@ -1,0 +1,114 @@
+import re
+import string
+from datetime import datetime, timedelta
+from util.openai_tools import complete
+
+def remove_non_alphanumeric(text):
+    pattern = r'[^a-zA-Z0-9\s]+'
+    return re.sub(pattern, '', text)
+
+def extract_insured_id(text):
+    # clean removing all non-alphanumeric but spaces
+    text = remove_non_alphanumeric(text)
+    # print(f"[INFO] Insured id cleaned: {text}")
+    # return id with 8-12 digits
+    pattern = r'\b[a-zA-Z]?\d{8,12}\b'
+    match = re.search(pattern, text)
+    if match:
+        return match.group()
+    else:
+        return ""
+
+def extract_cpthcpccode(text):
+    # clean removing all non-alphanumeric but spaces
+    text = remove_non_alphanumeric(text)
+    # print(f"[INFO]  Cpt cleaned: {text}")
+    # return cpt code
+    pattern = r'\b([0-9]{4}[0-9A-Z]{1}|[0-9]{5}|[A-Z][0-9]{4})\b'
+    # pattern = r'\b[A-Va-v]?\d{4,5}\b'
+    match = re.search(pattern, text)
+    if match:
+        return match.group()
+    else:
+        return ""
+
+def extract_charges(text):
+    # keep only numbers and
+    text = re.sub(r"[^0-9]", "", text)
+    # put in format 0.00
+    formatted_text = text[:-2] + '.' + text[-2:]
+    return formatted_text
+    
+def is_valid_date(date_string, max_years_old=5):
+    try:
+        date = datetime.strptime(date_string, '%m/%d/%Y')
+        if date <= datetime.today() and date >= datetime.today() - timedelta(days=(365*max_years_old)):
+            return True
+        else:
+            return False
+    except ValueError:
+        try:
+            # obs: does not check if the year is in the past when using 2 digits
+            date = datetime.strptime(date_string, '%m/%d/%y')
+            if date <= datetime.today() and date >= datetime.today() - timedelta(days=(365*max_years_old)):
+                return True
+            else:
+                return False
+        except ValueError:
+            return False
+
+def format_date(input_str):
+    # Remove everything that is not a number or space
+    input_str = re.sub(r'[^0-9\s]', '', input_str)
+    
+    # Remove spaces
+    input_str = input_str.replace(' ', '')
+    
+    # Format date based on length
+    if len(input_str) == 6:
+        return f"{input_str[:2]}/{input_str[2:4]}/{input_str[4:]}"
+    elif len(input_str) == 8:
+        return f"{input_str[:2]}/{input_str[2:4]}/{input_str[4:]}"
+    elif len(input_str) == 5:
+        return f"0{input_str[:1]}/{input_str[-4:-2]}/{input_str[-2:]}"
+    else:
+        return input_str    
+    
+def extract_date(text):
+    
+    # cleaning common noisy characters
+    text = text.replace(':', ' ')
+    text = text.replace('!', ' ')
+    text = text.replace('_', ' ')
+    
+    # remove all other punctuation
+    translator = str.maketrans('', '', string.punctuation)
+    text = text.translate(translator)
+    
+    # replace multiple consective spaces with a single space
+    text = re.sub(r'\s+', ' ', text)
+
+    # remove noisy from field labels (birth date field)
+    text = text.replace("3 P", "P")
+    text = text.replace("3P", "P")
+    text = text.replace("6 P", "P")
+    text = text.replace("6P", "P")    
+    parts = text.split("PATIENT REL")
+    text = parts[0]
+    text = re.sub(r'[^\d\s]+', '', text).strip()
+
+    # print(f"[INFO] Date regex: {text}") 
+    text = format_date(text)
+
+    return text
+
+def llm_extract_date(text):
+    prompt_filename = "prompts/date_inference.txt"
+    generated_date = complete(prompt_filename, {'text': text}).strip()
+    # keep only numbers and /
+    pattern = r"[0-9/]+"
+    matches = re.findall(pattern, generated_date)
+    generated_date =  "".join(matches)
+    if generated_date == "":
+        generated_date = "could not infer"   
+    return generated_date

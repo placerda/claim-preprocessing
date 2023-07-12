@@ -4,9 +4,60 @@
 # Import the necessary packages
 import cv2
 import numpy as np
+import imutils
+from util.general_utilities import load_image
 
 # -----------------------------
 #   FUNCTIONS
+# -----------------------------
+
+def extract_roi(image_path, coord):
+    # form rec cood = [x1, y1, x2, y2, x3, y3, x4, y4]
+    min_height = 60
+    min_width = 60
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    x1, y1, x3, y3 = coord[0], coord[1], coord[4], coord[5]
+    roi = image[y1:y3, x1:x3]
+    height, width = roi.shape
+    if height < min_height:
+        roi = imutils.resize(roi, height=min_height)
+    if width < min_width:
+        roi = imutils.resize(roi, width=min_width)
+    return roi
+
+def remove_blobs(img, area_threshold):
+    # convert image to binary
+    _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    # Find connected components
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=4)
+    # remove small blobs
+    for i in range(1, num_labels):
+        if stats[i, cv2.CC_STAT_AREA] < area_threshold:
+            labels[labels == i] = 0
+    # create new image with only large blobs
+    new_binary = np.zeros_like(binary)
+    new_binary[labels > 0] = 255
+    # convert binary image to grayscale
+    new_img = cv2.cvtColor(new_binary, cv2.COLOR_GRAY2BGR)
+    # invert image
+    new_img = cv2.bitwise_not(new_img)
+    return new_img
+
+def remove_hlines(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # convert image to binary
+    binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 2)
+    # apply morphological operations
+    kernel = np.ones((3, 40), np.uint8)
+    binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
+    # apply mask to image
+    gray[binary > 0] = 255
+    return gray
+
+
+# -----------------------------
+#   CURRENTLY NOT IN USE
 # -----------------------------
 
 def shift_down(image, shift=1, highlight=[0,0,255]):
@@ -76,8 +127,7 @@ def is_not_inside_bbox(contour,words):
                 return False
     return True
 
-
-def remove_vertical_lines(image, words):
+def remove_vertical_lines_old(image, words):
     result = image.copy()
     result_debug = image.copy()    
     gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
@@ -112,7 +162,6 @@ def fill_small_holes(img):
     return filled
 
 def remove_template(gray, template):
-    
     # 01. create a mask based on the template (form with empty fields)
     # mask will be used to remove template elements from the image
     mask = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
@@ -136,3 +185,4 @@ def remove_template(gray, template):
     # masked_image = fill_small_holes(masked_image) # Experimental
 
     return masked_image
+

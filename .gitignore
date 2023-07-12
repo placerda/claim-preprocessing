@@ -1,6 +1,7 @@
 # custom files
 data/
 local/
+test_logs/
 work*/
 launch.json
 .vscode/

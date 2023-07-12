@@ -1,17 +1,18 @@
 # Insurance Claim Preprocessing
 
-Preprocessing experimentations with Health Insurance Claim Forms template to improve data extraction using Form Recognizer.
+Preprocessing experimentations with Health Insurance 1500 Claim Forms template to improve data extraction using Form Recognizer.
 
-[General Notes](./Notes.md)
+**process_1500.py**
 
-**process.py**
+General processing flow steps
 
-- Align document to template
-- Apply masks to keep only the field labels and values
-- Remove template's background from final image
-- Add table frame
-- Run FR layout or custom model analysis
+- Detect QR Code
+- Crop image based on QR Code position
+- For each field
+    - Apply field's mask
+    - Remove background noise (blobs) *
+    - Analyze document with FR layout (high resolution on)
+    - Extract values with regex
+    - Use LLM to infer a valid value if applicable *
 
-**References**
-
-[Image alignment and registration with OpenCV](https://pyimagesearch.com/2020/08/31/image-alignment-and-registration-with-opencv/)
+\* not used in some fields
