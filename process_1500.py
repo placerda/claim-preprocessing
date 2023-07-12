@@ -472,7 +472,7 @@ for idx, image_file in enumerate(files):
                 total_charge = extract_charges(total_charge)
                 break
     logging.info(f"Total charge extracted: {total_charge}")             
-    result[28] = total_charge
+    result[29] = total_charge
 
     # 0n extract the next field and so on ...
     # TODO

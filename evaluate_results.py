@@ -33,7 +33,7 @@ def evaluate_results(ground_truth_file, evaluated_file, output_folder):
                 ground_truth_text, text = ground_truth_texts[col], texts[col]
                 if ground_truth_text == "": ground_truth_text = "-"
                 if text == "": text = "-"
-                if col in (0, 1, 2, 3, 5, 6): # temporarily validading only some columns
+                if col in (0, 1, 2, 3, 5, 6, 28): # temporarily validading only some columns
                     error_rate = jiwer.wer(ground_truth_text, text)
                 else:
                     error_rate = 0
