@@ -2,6 +2,7 @@ import re
 import string
 from datetime import datetime, timedelta
 from util.openai_tools import complete
+from util.general_utilities import count_digits
 
 def remove_non_alphanumeric(text):
     pattern = r'[^a-zA-Z0-9\s]+'
@@ -102,13 +103,19 @@ def extract_date(text):
 
     return text
 
+
 def llm_extract_date(text):
     prompt_filename = "prompts/date_inference.txt"
-    generated_date = complete(prompt_filename, {'text': text}).strip()
+    generated_date = complete(prompt_filename, text).strip()
     # keep only numbers and /
     pattern = r"[0-9/]+"
     matches = re.findall(pattern, generated_date)
     generated_date =  "".join(matches)
     if generated_date == "":
-        generated_date = "could not infer"   
+        generated_date = "could not infer"
+    else:
+        if count_digits(generated_date) == 8 and count_digits(text) == 6:
+            # force year to two digits when the input has only 6 digits
+            # prompt instruction to keep input format is not working
+            generated_date = generated_date[:-4] + generated_date[-2:]
     return generated_date
