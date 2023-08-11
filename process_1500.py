@@ -21,7 +21,6 @@ birth_date_mask_file = 'templates/birth_date-mask.jpg'
 startservdate_1_mask_file = 'templates/startservdate_1-mask.jpg'
 endservdate_1_mask_file = 'templates/endservdate_1-mask.jpg'
 cpthcpccode_1_mask_file = 'templates/cpthcpccode_1-mask.jpg'
-charges_1_mask_file = 'templates/charges_1-mask.jpg'
 total_charge_mask_file = 'templates/total_charge-mask.jpg'
 
 # initialization
@@ -33,8 +32,8 @@ qrcode_to_height_ratio = 20.86
 qrcode_to_width_ratio = 15.77
 qr_code_area_threshold = 0.1
 
-files = glob('data/test/*.pdf')
-# files = ['data/test/18835871_0.pdf']
+# files = glob('data/test/*.pdf'
+files = ['data/test/18834296_0.pdf']
 results = []
 
 for idx, image_file in enumerate(files):
@@ -42,8 +41,43 @@ for idx, image_file in enumerate(files):
     prefix = datetime.now().strftime("%Y%m%d-%H%M%S")
     logging.info(f"### PROCESSING FILE: {image_file} ({prefix})")
 
-    # initialize output
-    result = [image_file.split('/')[-1], "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]
+    record = {
+        'fileName': image_file.split('/')[-1],
+        'patientInsuredId': '',
+        'patientBirthday': '',
+        'startServDate_1': '', 
+        'endServDate_1': '', 
+        'qty_1': '', 
+        'cptHcpcCode_1': '', 
+        'charges_1': '', 
+        'startServDate_2': '', 
+        'endServDate_2': '', 
+        'qty_2': '', 
+        'cptHcpcCode_2': '', 
+        'charges_2': '', 
+        'startServDate_3': '', 
+        'endServDate_3': '', 
+        'qty_3': '',
+        'cptHcpcCode_3': '',
+        'charges_3': '',
+        'startServDate_4': '',
+        'endServDate_4': '',
+        'qty_4': '',
+        'cptHcpcCode_4': '',
+        'charges_4': '',
+        'startServDate_5': '',
+        'endServDate_5': '',
+        'qty_5': '',
+        'cptHcpcCode_5': '',
+        'charges_5': '',
+        'startServDate_6': '',
+        'endServDate_6': '',
+        'qty_6': '',
+        'cptHcpcCode_6': '',
+        'charges_6': '',        
+        'patientZipcode': '',
+        'total_charge': ''
+    }
 
     # 01 processing setup
     
@@ -55,14 +89,14 @@ for idx, image_file in enumerate(files):
     cropped, confidence, area = crop_from_qrcode(input_filename, qrcode_to_height_ratio, qrcode_to_width_ratio) # type: ignore
     if confidence < 0.8:
         logging.info(f"Low confidence record not processed. confidence: {confidence}")
-        results.append(result)
+        results.append(record)
         continue
     # check if qrcode is in the right size
     min_area = int(template_qrcode_area * (1 - qr_code_area_threshold))
     max_area = int(template_qrcode_area * (1 + qr_code_area_threshold))
     if area < min_area or area > max_area:
         logging.info(f"QR Code area {area} not in between {min_area} and {max_area}.")
-        results.append(result)
+        results.append(record)
         continue
     else:
         logging.info(f"QR Code area {area} in between {min_area} and {max_area}.")
@@ -95,7 +129,7 @@ for idx, image_file in enumerate(files):
             insured_id = extract_insured_id(insured_id)
             break
     logging.info(f"Insured's id extracted: {insured_id}")             
-    result[1] = insured_id
+    record['patientInsuredId'] = insured_id
     
     ###############################
     # 03 extract birth date
@@ -184,7 +218,7 @@ for idx, image_file in enumerate(files):
         else:
             valid_birth_date = ""    
     logging.info(f"Birth date extracted: {valid_birth_date}") 
-    result[2] = valid_birth_date
+    record['patientBirthday'] = valid_birth_date
 
     ###############################
     # 04 extract start serv date 1
@@ -274,7 +308,7 @@ for idx, image_file in enumerate(files):
         else:
             valid_startservdate_1 = ""    
     logging.info(f"Start serv date 1 extracted: {valid_startservdate_1}") 
-    result[3] = valid_startservdate_1
+    record['startServDate_1'] = valid_startservdate_1
 
     ###############################
     # 05 extract end serv date 1
@@ -363,7 +397,7 @@ for idx, image_file in enumerate(files):
         else:
             valid_endservdate_1 = ""    
     logging.info(f"End serv date 1 extracted: {valid_endservdate_1}") 
-    result[4] = valid_endservdate_1
+    record['endServDate_1'] = valid_endservdate_1
 
     ###############################
     # 06 extract cpth cpc code 1
@@ -385,51 +419,60 @@ for idx, image_file in enumerate(files):
             cpthcpccode_1 = extract_cpthcpccode(cpthcpccode_1)[-5:]
             break
     logging.info(f"Cpt code extracted: {cpthcpccode_1}")             
-    result[6] = cpthcpccode_1
+    record['cptHcpcCode_1'] = cpthcpccode_1
 
     ###############################
-    # 07 extract charges 1
+    # 07 extract charges
     ###############################
-    charges_1 = ""
+    def extract_charges_field(number):
+        charges = ""
+        charges_mask_file = f'templates/charges_{number}-mask.jpg'
+        
+        # apply mask
+        charges_mask = load_image(charges_mask_file, prefix, prefix=f'charges_{number}_mask', gray=True )
+        charges_masked = np.where(charges_mask == 0, cropped_adjusted, 255)
+        charges_masked_filename = get_filename(prefix, f"charges_{number}_masked" )
+        cv2.imwrite(charges_masked_filename, charges_masked)   
+        blob_sizes = [40]
+        attempt = 1
+        for blob_size in blob_sizes:
+            logging.info(f"Charges' {number} attempt {attempt} blob size {blob_size}")
+            charges_masked_temp = remove_blobs(charges_masked, blob_size)
+            charges_masked_temp = remove_hlines(charges_masked_temp)
+            charges_masked_temp = remove_blobs(charges_masked_temp, blob_size)
+            charges_masked_temp_filename = get_filename(prefix, f"charges_{number}_masked_temp" )
+            cv2.imwrite(charges_masked_temp_filename, charges_masked_temp)
+            # do the ocr
+            # fr_result = analyze_document_rest(charges_masked_temp_filename, "prebuilt-layout", features=['ocr.highResolution'])
+            fr_result = analyze_document_rest(charges_masked_temp_filename, "prebuilt-layout")
+            lines = fr_result['pages'][0]['lines']
+            for line in lines:
+                if count_digits(line['content']) >= 3:
+                    charges = line['content'].strip()
+                    logging.info(f"Charges' {number} OCR content: {charges}")
+                    charges = extract_charges(charges)
+                    break
+            if charges != "": break
+            attempt += 1
+        if charges == "":
+            logging.info(f"Charges' {number} attempt {attempt} no cleanning")
+            fr_result = analyze_document_rest(charges_masked_filename, "prebuilt-layout", features=['ocr.highResolution'])
+            lines = fr_result['pages'][0]['lines']
+            for line in lines:
+                if count_digits(line['content']) >= 3:
+                    charges = line['content'].strip()
+                    logging.info(f"Charges' {number} OCR content: {charges}")
+                    charges = extract_charges(charges)
+                    break
+        logging.info(f"Charges' {number} extracted: {charges}")
+        return charges             
 
-    # apply mask
-    charges_1_mask = load_image(charges_1_mask_file, prefix, prefix='charges_1_mask', gray=True )
-    charges_1_masked = np.where(charges_1_mask == 0, cropped_adjusted, 255)
-    charges_1_masked_filename = get_filename(prefix, "charges_1_masked" )
-    cv2.imwrite(charges_1_masked_filename, charges_1_masked)   
-    blob_sizes = [40]
-    attempt = 1
-    for blob_size in blob_sizes:
-        logging.info(f"Charges' 1 attempt {attempt} blob size {blob_size}")
-        charges_1_masked_temp = remove_blobs(charges_1_masked, blob_size)
-        charges_1_masked_temp = remove_hlines(charges_1_masked_temp)
-        charges_1_masked_temp = remove_blobs(charges_1_masked_temp, blob_size)
-        charges_1_masked_temp_filename = get_filename(prefix, "charges_1_masked_temp" )
-        cv2.imwrite(charges_1_masked_temp_filename, charges_1_masked_temp)
-        # do the ocr
-        fr_result = analyze_document_rest(charges_1_masked_temp_filename, "prebuilt-layout", features=['ocr.highResolution'])
-        lines = fr_result['pages'][0]['lines']
-        for line in lines:
-            if count_digits(line['content']) >= 3:
-                charges_1 = line['content'].strip()
-                logging.info(f"Charges' 1 OCR content: {charges_1}")
-                charges_1 = extract_charges(charges_1)
-                break
-        if charges_1 != "": break
-        attempt += 1
-    if charges_1 == "":
-        logging.info(f"Charges' 1 attempt {attempt} no cleanning")
-        fr_result = analyze_document_rest(charges_1_masked_filename, "prebuilt-layout", features=['ocr.highResolution'])
-        lines = fr_result['pages'][0]['lines']
-        for line in lines:
-            if count_digits(line['content']) >= 3:
-                charges_1 = line['content'].strip()
-                logging.info(f"Charges' 1 OCR content: {charges_1}")
-                charges_1 = extract_charges(charges_1)
-                break
-    logging.info(f"Charges' 1 extracted: {charges_1}")             
-    result[7] = charges_1
-
+    record['charges_1'] = extract_charges_field(1)
+    if record['charges_1'] != '': record['charges_2'] = extract_charges_field(2)
+    if record['charges_2'] != '': record['charges_3'] = extract_charges_field(3)
+    if record['charges_3'] != '': record['charges_4'] = extract_charges_field(4)
+    if record['charges_4'] != '': record['charges_5'] = extract_charges_field(5)
+    if record['charges_5'] != '': record['charges_6'] = extract_charges_field(6)
 
     ###############################
     # 08 extract total charge
@@ -472,22 +515,25 @@ for idx, image_file in enumerate(files):
                 total_charge = extract_charges(total_charge)
                 break
     logging.info(f"Total charge extracted: {total_charge}")             
-    result[29] = total_charge
+    record['total_charge'] = total_charge
 
     # 0n extract the next field and so on ...
     # TODO
 
-    results.append(result)
+    results.append(record)
 
 # save results
 timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 if not os.path.exists(work_dir): os.makedirs(work_dir)
 output_file = os.path.join(work_dir, f'{timestamp}.csv')
-with open(output_file, "w", newline="") as f:
-    writer = csv.writer(f)
-    header = ["fileName", "patientInsuredId", "patientBirthday", "startServDate_1", "endServDate_1", "qty_1", "cptHcpcCode_1", "charges_1", "startServDate_2", "endServDate_2", "qty_2", "cptHcpcCode_2", "charges_2", "startServDate_3", "endServDate_3", "qty_3", "cptHcpcCode_3", "charges_3", "startServDate_4", "endServDate_4", "qty_4", "cptHcpcCode_4", "charges_4", "startServDate_5", "endServDate_5", "qty_5", "cptHcpcCode_5", "charges_5", "patientZipcode", "total_charge"]
-    writer.writerow(header)
-    writer.writerows(results)
 
+# assuming you have a list of dictionaries called `results`
+header = ["fileName", "patientInsuredId", "patientBirthday", "startServDate_1", "endServDate_1", "qty_1", "cptHcpcCode_1", "charges_1", "startServDate_2", "endServDate_2", "qty_2", "cptHcpcCode_2", "charges_2", "startServDate_3", "endServDate_3", "qty_3", "cptHcpcCode_3", "charges_3", "startServDate_4", "endServDate_4", "qty_4", "cptHcpcCode_4", "charges_4", "startServDate_5", "endServDate_5", "qty_5", "cptHcpcCode_5", "charges_5", "startServDate_6", "endServDate_6", "qty_6", "cptHcpcCode_6", "charges_6", "patientZipcode", "total_charge"]
+
+with open(output_file, "w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=header)
+    writer.writeheader()
+    for result in results:
+        writer.writerow(result)
 logging.info(f"Results file: {output_file}") 
 logging.info(f"Done")
