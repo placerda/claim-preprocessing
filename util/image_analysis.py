@@ -19,6 +19,8 @@ import time
 ### Vision Analysis
 
 QR_CODE_MODEL_NAME = "qrcode01"
+# FORM_REC_API_VERSION = "2023-02-28-preview"
+FORM_REC_API_VERSION = "2023-07-31"
 
 def crop_from_qrcode(input_image, qrcode_to_height_ratio, qrcode_to_width_ratio):
     """
@@ -147,9 +149,9 @@ def analyze_document_rest(filepath, model, features=[]):
     # if user wants to get features
     if len(features) > 0:
         features_str = ",".join(features) # TODO: review if this is the proper way to add a list of features to the parameters   
-        request_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}:analyze?api-version=2023-02-28-preview&features={features_str}"
+        request_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}:analyze?api-version={FORM_REC_API_VERSION}&features={features_str}"
     else:
-        request_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}:analyze?api-version=2023-02-28-preview"
+        request_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}:analyze?api-version={FORM_REC_API_VERSION}"
     
     try:
         # Send request
