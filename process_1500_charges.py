@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO)
 work_dir = 'work'
 # files = glob('data/test/*.pdf')
 files = glob('data/newtest/*.pdf')
-files = ['data/newtest/19019203.pdf']
+files = ['data/newtest/19018149.pdf']
 results = []
 
 ###############################
@@ -130,6 +130,7 @@ for idx, image_file in enumerate(files):
     previous_top = 0
     word_count = 0
     buffer = ''
+    # read words
     words = first_page['words']
     for word in words:
         word_count += 1
@@ -147,7 +148,7 @@ for idx, image_file in enumerate(files):
         word_content = word['content']
         word_position += 1
 
-        # expermintal logic to remove 1's that are actually pipes (review)
+        # remove 1's that are actually pipes (review)
         words_in_line = count_words_in_line(words, line_number, line_threshold)
         if words_in_line > 1 and word_position == words_in_line and len(word_content) == 3:
             word_content = word_content[1:]
