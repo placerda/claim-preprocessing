@@ -34,10 +34,12 @@ def extract_cpthcpccode(text):
         return ""
 
 def extract_charges(text):
-    # keep only numbers and
-    text = re.sub(r"[^0-9]", "", text)
-    # put in format 0.00
-    formatted_text = text[:-2] + '.' + text[-2:]
+    formatted_text = ''
+    if len(text) >= 3:
+        # keep only numbers and
+        text = re.sub(r"[^0-9]", "", text)
+        # put in format 0.00
+        formatted_text = text[:-2] + '.' + text[-2:]
     return formatted_text
     
 def is_valid_date(date_string, max_years_old=5):

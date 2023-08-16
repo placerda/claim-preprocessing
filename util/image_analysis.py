@@ -12,17 +12,47 @@ import base64
 import requests
 import json
 import time
+
+# globals
+# FORM_REC_API_VERSION = "2023-02-28-preview"
+FORM_REC_API_VERSION = "2023-07-31"
+VISION_ENDPOINT=os.environ["VISION_ENDPOINT"]
+VISION_KEY = os.environ["VISION_KEY"]
+QR_CODE_MODEL_NAME = "qrcode01"
+CHARGES_MODEL_NAME = "charges01"
+
 # -----------------------------
 #   FUNCTIONS
 # -----------------------------
 
-### Vision Analysis
+### Computer Vision Analysis
 
-QR_CODE_MODEL_NAME = "qrcode01"
-# FORM_REC_API_VERSION = "2023-02-28-preview"
-FORM_REC_API_VERSION = "2023-07-31"
+def object_detection_rest(filepath, model):
+    
+    # Request headers
+    headers = {
+        "Content-Type": "application/octet-stream",
+        "Ocp-Apim-Subscription-Key": VISION_KEY
+    }
 
-def crop_from_qrcode(input_image, qrcode_to_height_ratio, qrcode_to_width_ratio):
+    image_data = open(filepath, "rb").read()
+
+    request_endpoint = f"{VISION_ENDPOINT}computervision/imageanalysis:analyze?api-version=2023-02-01-preview&model-name={model}"
+    
+    # Send request
+    response = requests.post(request_endpoint, headers=headers, data=image_data)
+
+    # Parse response
+    if response.status_code in (200, 202):
+        result = json.loads(response.text)
+    else:
+        # Request failed
+        print("Error request: ", response.text)
+        exit()
+
+    return result
+
+def crop_from_qrcode(input_image):
     """
     Crops an image to the bounding box and bellow of a QR code detected in the image using Computer Vision service.
 

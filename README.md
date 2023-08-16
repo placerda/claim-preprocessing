@@ -16,3 +16,7 @@ General processing flow steps
     - Use LLM to infer a valid value if applicable *
 
 \* not used in some fields
+
+** pre-reqs **
+
+conda install -c conda-forge poppler
