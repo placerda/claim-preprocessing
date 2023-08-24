@@ -20,8 +20,8 @@ logging.basicConfig(level=logging.INFO)
 # initialization
 work_dir = 'work'
 # files = glob('data/test/*.pdf')
-files = glob('data/newtest/*.pdf')
-files = ['data/newtest/19018149.pdf']
+# files = glob('data/newtest/*.pdf')
+files = ['data/newtest/19018150.pdf']
 results = []
 
 ###############################
@@ -64,17 +64,65 @@ def count_words_in_line(words, line_number, line_threshold):
     word_count = 0
     previous_top = 0
     current_line = -1
+    line_threshold = 5 # adjust this value to fit your needs
     for word in words:
-        word_count += 1
         top = word['polygon'][1]
-        if top - previous_top > line_threshold:
+        if abs(top - previous_top) > line_threshold:
             if current_line == line_number:
                 return word_count            
             current_line += 1
             previous_top = top
             word_count = 0
+        word_count += 1
     # last line
-    return word_count
+    if current_line == line_number:
+        return word_count
+    return 0
+
+# def count_words_in_line(words, line_number, line_threshold):
+#     word_count = 0
+#     previous_top = 0
+#     current_line = -1
+#     for word in words:
+#         word_count += 1
+#         top = word['polygon'][1]
+#         if abs(top - previous_top) > line_threshold:
+#             if current_line == line_number:
+#                 return word_count            
+#             current_line += 1
+#             previous_top = top
+#             word_count = 0
+#     # last line
+#     return word_count
+        
+
+def sort_words(words):
+    words = sorted(words, key=lambda word: (word['polygon'][1]))
+    rows = []
+    row = []
+
+    for word in words:
+        if len(row) == 0:
+            row.append(word)
+        else:
+            if abs(word['polygon'][1] - row[0]['polygon'][1]) < line_threshold:
+                row.append(word)
+            else:
+                rows.append(row)
+                row = []
+                row.append(word)
+    if len(row) > 0:
+        rows.append(row)
+    
+    words = []
+    for row in rows:
+        row = sorted(row, key=lambda word: (word['polygon'][0]))
+        words.append(row)
+
+    # flatten
+    words = [item for sublist in words for item in sublist]
+    
+    return words
 
 for idx, image_file in enumerate(files):
 
@@ -123,7 +171,7 @@ for idx, image_file in enumerate(files):
     cv2.imwrite(charges_cleaned_filename, cleaned_charges) 
 
     fr_result = analyze_document_rest(charges_cleaned_filename, "prebuilt-layout", features=['ocr.highResolution'])
-    line_threshold = 10
+    line_threshold = 30
     first_page = fr_result['pages'][0]
     line_number = 0
     word_position = 0
@@ -132,10 +180,11 @@ for idx, image_file in enumerate(files):
     buffer = ''
     # read words
     words = first_page['words']
-    for word in words:
+    words = sort_words(words)
+    for word in words:  
         word_count += 1
         top = word['polygon'][1] # top
-        if top - previous_top > line_threshold and line_number <= 6:
+        if abs(top - previous_top) > line_threshold and line_number <= 6:
             if previous_top > 0:
                 charge = extract_charges(buffer)
                 if len(charge) > 3:
@@ -148,10 +197,22 @@ for idx, image_file in enumerate(files):
         word_content = word['content']
         word_position += 1
 
-        # remove 1's that are actually pipes (review)
+        # post-processing to remove 1's that are actually pipes (review)
         words_in_line = count_words_in_line(words, line_number, line_threshold)
         if words_in_line > 1 and word_position == words_in_line and len(word_content) == 3:
-            word_content = word_content[1:]
+            if word_content[0] == '1':
+                word_content = word_content[1:]
+            elif word_content[2] == '1':    
+                word_content = word_content[:2]
+        if words_in_line == 1 and word_position == words_in_line and len(word_content) == 3:
+            if word_content[0] == '1':
+                word_content = word_content[1:]
+            elif word_content[2] == '1':    
+                word_content = word_content[:2]
+
+        # post-processing to add integral part when missing
+        if words_in_line == 1 and len(word_content) == 2:
+                word_content = '0.' + word_content
 
         buffer += word_content
         if word_count == len(words): # last word
