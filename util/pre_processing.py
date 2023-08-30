@@ -5,7 +5,7 @@
 import cv2
 import numpy as np
 import imutils
-from util.general_utilities import load_image
+from util.utils import load_image
 
 # -----------------------------
 #   FUNCTIONS
@@ -55,6 +55,85 @@ def remove_hlines(image):
     gray[binary > 0] = 255
     return gray
 
+# -------------------------------------
+#   Cropping Charges and Total Charges
+# -------------------------------------
+
+def crop_charges(input_image, cv_result):
+
+    # cropping parameters
+    roi_max_height = 400
+    side_border = 7 # pixels
+    height_multiplier = 7
+    min_charges_detection_confidence = 0.7
+
+    # initialize the cropped images
+    cropped_charges = np.zeros((roi_max_height,400,3),np.uint8)
+    confidence = -1.0
+    found_charges = False
+
+    for object in cv_result['customModelResult']['objectsResult']['values']:
+        for tag in object['tags']:
+            if tag['confidence'] >= min_charges_detection_confidence and tag['name'] == 'charges':
+                image = cv2.imread(input_image)
+                x = object['boundingBox']['x']
+                y = object['boundingBox']['y']
+                w = object['boundingBox']['w']
+                h = object['boundingBox']['h']
+
+                roi_height = height_multiplier*h
+                roi_height = min(roi_height, roi_max_height)
+                cropped_charges = image[y+h:y+roi_height, x+side_border:x+w-side_border]
+              
+                confidence = tag['confidence']
+                found_charges = True
+
+    return cropped_charges, confidence, found_charges
+
+def crop_total_charges(input_image, cv_result):
+
+    # cropping parameters
+    roi_max_height = 400
+    side_border = 1 # pixels
+    height_multiplier = 4.5
+    width_multiplier= 1.3
+    min_total_charges_detection_confidence = 0.20
+
+    # initialize the cropped images
+    cropped_charges = np.zeros((roi_max_height,400,3),np.uint8)
+    cropped_charges[:,:] = (255,255,255)
+    confidence = -1.0
+    found_charges = False
+
+    # get highest confidence for total charges
+    object = {}
+    highest_confidence = 0.0
+    for obj in cv_result['customModelResult']['objectsResult']['values']:
+        for tag in obj['tags']:
+            if tag['confidence'] > highest_confidence and tag['name'] == 'totacharges':
+                highest_confidence = tag['confidence']
+                object = obj
+    
+    # check if object was found
+    if object != {}:
+        for tag in object['tags']:
+            if tag['confidence'] >= min_total_charges_detection_confidence and tag['name'] == 'totacharges':
+                image = cv2.imread(input_image)
+                x = object['boundingBox']['x']
+                y = object['boundingBox']['y']
+                w = object['boundingBox']['w']
+                h = object['boundingBox']['h']
+
+                roi_height = int(height_multiplier*h)
+                roi_width = int(width_multiplier*w)
+                
+                crop = image[y+h:y+roi_height, x+side_border:x+roi_width]
+                cropped_charges[:crop.shape[0], :crop.shape[1]] = crop
+                
+                confidence = tag['confidence']
+                found_charges = True
+
+    return cropped_charges, confidence, found_charges
 
 # -----------------------------
 #   CURRENTLY NOT IN USE

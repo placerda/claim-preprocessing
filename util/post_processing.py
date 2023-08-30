@@ -1,8 +1,8 @@
 import re
 import string
 from datetime import datetime, timedelta
-from util.openai_tools import complete
-from util.general_utilities import count_digits
+from util.openai_api import complete
+from util.utils import count_digits
 
 def remove_non_alphanumeric(text):
     pattern = r'[^a-zA-Z0-9\s]+'
@@ -121,3 +121,50 @@ def llm_extract_date(text):
             # prompt instruction to keep input format is not working
             generated_date = generated_date[:-4] + generated_date[-2:]
     return generated_date
+
+def count_words_in_line(words, line_number, line_threshold):
+    word_count = 0
+    previous_top = 0
+    current_line = -1
+    line_threshold = 5 # adjust this value to fit your needs
+    for word in words:
+        top = word['polygon'][1]
+        if abs(top - previous_top) > line_threshold:
+            if current_line == line_number:
+                return word_count            
+            current_line += 1
+            previous_top = top
+            word_count = 0
+        word_count += 1
+    # last line
+    if current_line == line_number:
+        return word_count
+    return 0
+
+def sort_words(words, line_threshold):
+    words = sorted(words, key=lambda word: (word['polygon'][1]))
+    rows = []
+    row = []
+
+    for word in words:
+        if len(row) == 0:
+            row.append(word)
+        else:
+            if abs(word['polygon'][1] - row[0]['polygon'][1]) < line_threshold:
+                row.append(word)
+            else:
+                rows.append(row)
+                row = []
+                row.append(word)
+    if len(row) > 0:
+        rows.append(row)
+    
+    words = []
+    for row in rows:
+        row = sorted(row, key=lambda word: (word['polygon'][0]))
+        words.append(row)
+
+    # flatten
+    words = [item for sublist in words for item in sublist]
+    
+    return words
