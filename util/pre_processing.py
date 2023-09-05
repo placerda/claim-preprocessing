@@ -64,7 +64,7 @@ def crop_charges(input_image, cv_result):
     # cropping parameters
     roi_max_height = 400
     side_border = 7 # pixels
-    height_multiplier = 7
+    height_multiplier = 10
     min_charges_detection_confidence = 0.7
 
     # initialize the cropped images
@@ -72,10 +72,20 @@ def crop_charges(input_image, cv_result):
     confidence = -1.0
     found_charges = False
 
-    for object in cv_result['customModelResult']['objectsResult']['values']:
+    # get highest confidence for charges
+    object = {}
+    highest_confidence = 0.0
+    for obj in cv_result['customModelResult']['objectsResult']['values']:
+        for tag in obj['tags']:
+            if tag['confidence'] > highest_confidence and tag['name'] == 'charges':
+                highest_confidence = tag['confidence']
+                object = obj
+
+   # check if object was found
+    if object != {}:
         for tag in object['tags']:
             if tag['confidence'] >= min_charges_detection_confidence and tag['name'] == 'charges':
-                image = cv2.imread(input_image)
+                image = cv2.imread(input_image)                
                 x = object['boundingBox']['x']
                 y = object['boundingBox']['y']
                 w = object['boundingBox']['w']
@@ -83,7 +93,7 @@ def crop_charges(input_image, cv_result):
 
                 roi_height = height_multiplier*h
                 roi_height = min(roi_height, roi_max_height)
-                cropped_charges = image[y+h:y+roi_height, x+side_border:x+w-side_border]
+                cropped_charges = image[y+h:y+h+roi_height, x+side_border:x+w-side_border]
               
                 confidence = tag['confidence']
                 found_charges = True

@@ -7,9 +7,11 @@ import os
 import cv2
 import requests
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # globals
-# FORM_REC_API_VERSION = "2023-02-28-preview"
 FORM_REC_API_VERSION = "2023-07-31"
 VISION_ENDPOINT=os.environ["VISION_ENDPOINT"]
 VISION_KEY = os.environ["VISION_KEY"]

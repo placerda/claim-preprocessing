@@ -7,6 +7,7 @@ import imutils
 import os
 import shutil
 from pdf2image import convert_from_path
+import logging
 
 # -----------------------------
 #   FUNCTIONS
@@ -43,8 +44,13 @@ def get_filename(prefix, sufix, filename="", extension="jpg"):
     work_file = f"{work_dir}/{prefix}-{sufix}.{extension}"
     if extension == "jpg" and filename.endswith(".pdf"):
         # needs to convert pdf to jpg
-        pages = convert_from_path(filename, dpi=200)
-        pages[0].save(work_file, 'JPEG')
+        try:
+            pages = convert_from_path(filename, dpi=200)
+            pages[0].save(work_file, 'JPEG')
+        except Exception as e:
+            logging.error(f"Could not get the first page, check if poppler is installed. {e}")
+            exit()        
+
     elif os.path.exists(filename):
         shutil.copy(filename, work_file)
     return work_file
