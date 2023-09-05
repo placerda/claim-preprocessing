@@ -40,6 +40,9 @@ def extract_charges(text):
         text = re.sub(r"[^0-9]", "", text)
         # put in format 0.00
         formatted_text = text[:-2] + '.' + text[-2:]
+    elif len(text) == 2:
+        text = re.sub(r"[^0-9]", "", text)
+        formatted_text = '0.' + text
     return formatted_text
     
 def is_valid_date(date_string, max_years_old=5):

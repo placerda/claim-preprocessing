@@ -100,7 +100,7 @@ def process_forms(files=None):
         cv2.imwrite(charges_cleaned_filename, cleaned_charges) 
 
         fr_result = analyze_document_rest(charges_cleaned_filename, "prebuilt-layout", features=['ocr.highResolution'])
-        line_threshold = 30
+        line_threshold = 25
         max_distance_between_charges = 200
         first_page = fr_result['pages'][0]
         line_number = 0
@@ -140,10 +140,6 @@ def process_forms(files=None):
                     word_content = word_content[1:]
                 elif word_content[2] == '1':    
                     word_content = word_content[:2]
-
-            # post-processing to add integral part when missing
-            if words_in_line == 1 and len(word_content) == 2:
-                    word_content = '0.' + word_content
 
             buffer += word_content
             if word_count == len(words): # last word
