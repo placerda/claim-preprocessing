@@ -4,10 +4,16 @@ Health Insurance 1500 Claim Forms preprocessing and postprocessing scripts for F
 
 ### Scripts
 
-- process_1500_charges.py: extracts charges and total charges.
+- process_1500.py: extracts charges and total charges.
 
 ### Pre-reqs
 
-- Conda install -c conda-forge poppler
+- Poppler: ```Conda install -c conda-forge poppler```
 
-- Object detection model trained to detect **charges** and **totalcharge** objects.
+- Object detection model trained to detect **charges**, **totacharges**, **datesofservice**, **qty** and **birthdate** objects.
+
+### How to run?
+
+```python process_1500.py -i [FOLDER_WHERE_PDFS_ARE_OR_SINGLE_PDF_PATH]```
+
+
