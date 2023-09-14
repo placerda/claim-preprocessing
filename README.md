@@ -15,5 +15,3 @@ Health Insurance 1500 Claim Forms preprocessing and postprocessing scripts for F
 ### How to run?
 
 ```python process_1500.py -i [FOLDER_WHERE_PDFS_ARE_OR_SINGLE_PDF_PATH]```
-
-
