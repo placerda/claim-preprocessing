@@ -63,12 +63,13 @@ def crop_charges(input_image, cv_result):
 
     # cropping parameters
     roi_max_height = 400
+    roi_max_width = 400
     side_border = 7 # pixels
     height_multiplier = 10
     min_charges_detection_confidence = 0.7
 
     # initialize the cropped images
-    cropped_charges = np.zeros((roi_max_height,400,3),np.uint8)
+    cropped_charges = np.zeros((roi_max_width,roi_max_width,3),np.uint8)
     confidence = -1.0
     found_charges = False
 
@@ -104,13 +105,14 @@ def crop_total_charges(input_image, cv_result):
 
     # cropping parameters
     roi_max_height = 400
+    roi_max_width = 400
     side_border = 1 # pixels
     height_multiplier = 4.5
     width_multiplier= 1.3
     min_total_charges_detection_confidence = 0.20
 
     # initialize the cropped images
-    cropped_charges = np.zeros((roi_max_height,400,3),np.uint8)
+    cropped_charges = np.zeros((roi_max_height,roi_max_width,3),np.uint8)
     cropped_charges[:,:] = (255,255,255)
     confidence = -1.0
     found_charges = False
@@ -144,6 +146,48 @@ def crop_total_charges(input_image, cv_result):
                 found_charges = True
 
     return cropped_charges, confidence, found_charges
+
+def crop_dates(input_image, cv_result):
+
+    # cropping parameters
+    roi_max_height = 390
+    roi_max_width = 400
+    side_border = 7 # pixels
+    height_multiplier = 10
+    min_dates_detection_confidence = 0.7
+
+    # initialize the cropped images
+    cropped_dates = np.zeros((roi_max_height,roi_max_width,3),np.uint8)
+    confidence = -1.0
+    found_charges = False
+
+    # get highest confidence for charges
+    object = {}
+    highest_confidence = 0.0
+    for obj in cv_result['customModelResult']['objectsResult']['values']:
+        for tag in obj['tags']:
+            if tag['confidence'] > highest_confidence and tag['name'] == 'datesofservice':
+                highest_confidence = tag['confidence']
+                object = obj
+
+   # check if object was found
+    if object != {}:
+        for tag in object['tags']:
+            if tag['confidence'] >= min_dates_detection_confidence and tag['name'] == 'datesofservice':
+                image = cv2.imread(input_image)                
+                x = object['boundingBox']['x']
+                y = object['boundingBox']['y']
+                w = object['boundingBox']['w']
+                h = object['boundingBox']['h']
+
+                roi_height = height_multiplier*h
+                roi_height = min(roi_height, roi_max_height)
+                cropped_dates = image[y+h:y+h+roi_height, x+side_border:x+w-side_border]
+              
+                confidence = tag['confidence']
+                found_charges = True
+
+    return cropped_dates, confidence, found_charges
 
 # -----------------------------
 #   CURRENTLY NOT IN USE
@@ -274,4 +318,3 @@ def remove_template(gray, template):
     # masked_image = fill_small_holes(masked_image) # Experimental
 
     return masked_image
-

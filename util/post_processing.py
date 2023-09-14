@@ -39,7 +39,10 @@ def extract_charges(text):
         # keep only numbers and
         text = re.sub(r"[^0-9]", "", text)
         # put in format 0.00
-        formatted_text = text[:-2] + '.' + text[-2:]
+        if len(text) == 2:
+            formatted_text = '0.' + text
+        else:
+            formatted_text = text[:-2] + '.' + text[-2:]
     elif len(text) == 2:
         text = re.sub(r"[^0-9]", "", text)
         formatted_text = '0.' + text

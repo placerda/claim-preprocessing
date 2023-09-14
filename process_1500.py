@@ -1,5 +1,5 @@
 from util.utils import load_image, get_filename
-from util.pre_processing import remove_blobs, remove_hlines, crop_charges, crop_total_charges
+from util.pre_processing import remove_blobs, remove_hlines, crop_dates, crop_charges, crop_total_charges
 from util.post_processing import extract_charges, sort_words, count_words_in_line
 from util.computervision_api import object_detection_rest
 from util.formrec_api import analyze_document_rest
@@ -40,7 +40,7 @@ def process_forms(files=None):
         logging.info(f"No files to process")
 
     ###############################
-    # extract charges
+    # process forms
     ###############################
 
     for idx, image_file in enumerate(files):
@@ -60,6 +60,18 @@ def process_forms(files=None):
             'charges_4': '',
             'charges_5': '',
             'charges_6': '',
+            'start_date_1': '', 
+            'start_date_2': '', 
+            'start_date_3': '',
+            'start_date_4': '',
+            'start_date_5': '',
+            'start_date_6': '',   
+            'end_date_1': '', 
+            'end_date_2': '', 
+            'end_date_3': '',
+            'end_date_4': '',
+            'end_date_5': '',
+            'end_date_6': '',                        
             'total_charges': ''
         }
 
@@ -78,7 +90,7 @@ def process_forms(files=None):
         object_detection_result = object_detection_rest(input_filename, VISION_MODEL)
 
         ###############################
-        # extract charges grid
+        # extract charges
         ###############################
 
         # crop charges
@@ -99,7 +111,7 @@ def process_forms(files=None):
         charges_cleaned_filename = get_filename(prefix, "charges_cleaned" )
         cv2.imwrite(charges_cleaned_filename, cleaned_charges) 
 
-        fr_result = analyze_document_rest(charges_cleaned_filename, "prebuilt-layout", features=['ocr.highResolution'])
+        fr_result = analyze_document_rest(charges_cleaned_filename, "prebuilt-read")  # features=['ocr.highResolution']
         line_threshold = 25
         max_distance_between_charges = 200
         first_page = fr_result['pages'][0]
@@ -138,8 +150,6 @@ def process_forms(files=None):
             if words_in_line == 1 and word_position == words_in_line and len(word_content) == 3:
                 if word_content[0] == '1':
                     word_content = word_content[1:]
-                elif word_content[2] == '1':    
-                    word_content = word_content[:2]
 
             buffer += word_content
             if word_count == len(words): # last word
@@ -170,7 +180,7 @@ def process_forms(files=None):
         total_charges_cleaned_filename = get_filename(prefix, "total_charges_cleaned" )
         cv2.imwrite(total_charges_cleaned_filename, cleaned_total_charges) 
 
-        fr_result = analyze_document_rest(total_charges_cleaned_filename, "prebuilt-layout", features=['ocr.highResolution'])
+        fr_result = analyze_document_rest(total_charges_cleaned_filename, "prebuilt-read") # features=['ocr.highResolution']
         line_threshold = 30
         first_page = fr_result['pages'][0]
         line_number = 0
@@ -213,10 +223,6 @@ def process_forms(files=None):
                 elif word_content[2] == '1':    
                     word_content = word_content[:2]
 
-            # post-processing to add integral part when missing
-            if words_in_line == 1 and len(word_content) == 2:
-                    word_content = '0.' + word_content
-
             buffer += word_content
             if word_count == len(words): # last word
                 line_number += 1
@@ -225,7 +231,125 @@ def process_forms(files=None):
                     record[f'total_charges'] = charge
                     logging.info(f'total_charges ({round(confidence,2)}) = {charge}')
                     break
+
+        ###############################
+        # extract dates
+        ###############################
+
+        def count_digits(string):
+            count = 0
+            for char in string:
+                if char.isdigit():
+                    count += 1
+            return count
+        
+        def format_date(date_str):
+            if len(date_str) == 6:
+                return f"{date_str[:2]}/{date_str[2:4]}/{date_str[4:]}"
+            elif len(date_str) == 8:
+                return f"{date_str[:2]}/{date_str[2:4]}/{date_str[4:]}"
+            else:
+                return None
+
+        # crop dates
+        cropped_dates, confidence, found_dates = crop_dates(input_filename, object_detection_result) # type: ignore
+        if not found_dates:
+            logging.info(f"Could not detect dates. Confidence: {confidence}")
+            results.append(record)
+
+        cropped_dates = cv2.cvtColor(cropped_dates, cv2.COLOR_BGR2GRAY)
+        cropped_filename = get_filename(prefix, "cropped_dates")
+        cv2.imwrite(cropped_filename, cropped_dates)
+
+        cleaned_dates = remove_blobs(cropped_dates, 40)
+        cleaned_dates = remove_hlines(cleaned_dates)
+        cleaned_dates = remove_blobs(cleaned_dates, 10)
+        cleaned_dates = remove_hlines(cleaned_dates)
+
+        dates_cleaned_filename = get_filename(prefix, "dates_cleaned" )
+        cv2.imwrite(dates_cleaned_filename, cleaned_dates) 
+
+        fr_result = analyze_document_rest(dates_cleaned_filename, "prebuilt-read")  # features=['ocr.highResolution']
+        line_threshold = 20
+        first_page = fr_result['pages'][0]
+        line_number = 0
+        word_position = 0
+        previous_top = 0
+        word_count = 0
+        buffer = ''
+        start_date=''
+        end_date=''        
+        # read words
+        words = first_page['words']
+        words = sort_words(words, line_threshold)
+
+        words =  [word for word in words if len([char for char in word['content'] if char.isdigit()]) >= 2]
+        # words = [{'content': ''.join([char for char in word['content'] if char.isdigit()])} for word in words]
+
+        for word in words:
+            word_count += 1
+
+            if len(word['content']) > 1 and len(word['content']) <= 8 and count_digits(word['content']) >= 2:
+                top = word['polygon'][1] # top
+                if abs(top - previous_top) > line_threshold and line_number < 7:
+                    if previous_top > 0:
+                        # date = buffer # extract_dates(buffer)
+                        if len(start_date) >=6 :
+                            line_number += 1
+                            start_date = format_date(start_date)
+                            end_date = format_date(end_date)                             
+                            record[f'start_date_{line_number}'] = start_date
+                            logging.info(f'start_date_{line_number} ({round(confidence,2)}) = {start_date}')
+                            record[f'end_date_{line_number}'] = end_date
+                            logging.info(f'end_date_{line_number} ({round(confidence,2)}) = {end_date}')                        
+                        word_position = 0                
+                        buffer = ''
+                        start_date=''
+                        end_date=''
+
+                word_content = word['content']
+                word_content = ''.join(char for char in word_content if char.isdigit())
+
+                word_position += 1
+                previous_top = top
+
+                # post-processing to remove 1's that are actually pipes (review)
+                words_in_line = count_words_in_line(words, line_number, line_threshold)
+                if len(word_content) == 3 or len(word_content) == 5:
+                    if word_content[0] == '1':
+                        word_content = word_content[1:]
+                    elif word_content[-1] == '1':    
+                        word_content = word_content[:-1]
                 
+                # buffer += word_content
+
+                if len(start_date) < 6 or (len(end_date) == 4 and len(word_content) == 4):
+                    start_date = start_date +  word_content
+                else:
+                    end_date = end_date + word_content
+
+                if word_count == len(words): # last word
+                    line_number += 1
+                    # date = date #  extract_charges(buffer)
+                    if line_number < 7 and len(start_date) >= 6:
+                        start_date = format_date(start_date)
+                        end_date = format_date(end_date)                        
+                        record[f'start_date_{line_number}'] = start_date
+                        logging.info(f'start_date_{line_number} ({round(confidence,2)}) = {start_date}')
+                        record[f'end_date_{line_number}'] = end_date
+                        logging.info(f'end_date_{line_number} ({round(confidence,2)}) = {end_date}')                          
+                
+    
+        ###############################
+        # extract qty
+        ###############################
+        # TODO
+
+        ###############################
+        # extract birth date
+        ###############################
+        # TODO
+
         results.append(record)
             
     if len(results) > 0:
@@ -235,7 +359,10 @@ def process_forms(files=None):
         output_file = os.path.join(work_dir, f'{timestamp}.csv')
 
         # assuming you have a list of dictionaries called `results`
-        header = ["fileName", "charges_1", "charges_2", "charges_3", "charges_4", "charges_5", "charges_6", "total_charges"]
+        header = ['fileName', 'charges_1', 'charges_2', 'charges_3', 'charges_4', 'charges_5', 'charges_6', 'total_charges',
+                  'start_date_1', 'start_date_2','start_date_3','start_date_4', 'start_date_5', 'start_date_6', 'end_date_1',
+                  'end_date_2', 'end_date_3', 'end_date_4', 'end_date_5', 'end_date_6']
+
         with open(output_file, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=header)
             writer.writeheader()

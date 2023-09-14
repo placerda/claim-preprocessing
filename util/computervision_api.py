@@ -2,7 +2,6 @@
 #   IMPORTS
 # -----------------------------
 # Import the necessary packages
-import azure.ai.vision as sdk
 import os
 import cv2
 import requests

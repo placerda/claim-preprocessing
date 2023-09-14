@@ -131,7 +131,7 @@ def analyze_document_rest(filepath, model, features=[]):
         exit()
 
     # Poll for result
-    result_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/prebuilt-layout/analyzeResults/{operation_id}"
+    result_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}/analyzeResults/{operation_id}"
     result_headers = headers.copy()
     result_headers["Content-Type"] = "application/json-patch+json"
     result = {}
