@@ -56,7 +56,7 @@ def remove_hlines(image):
     return gray
 
 # -------------------------------------
-#   Cropping Charges and Total Charges
+#   Cropping Regions of Interest for each field
 # -------------------------------------
 
 def crop_charges(input_image, cv_result):
@@ -147,6 +147,48 @@ def crop_total_charges(input_image, cv_result):
 
     return cropped_charges, confidence, found_charges
 
+def crop_qty(input_image, cv_result):
+
+    # cropping parameters
+    roi_max_height = 390
+    roi_max_width = 400
+    side_border = 7 # pixels
+    height_multiplier = 10
+    min_qty_detection_confidence = 0.7
+
+    # initialize the cropped images
+    cropped_qty = np.zeros((roi_max_width,roi_max_width,3),np.uint8)
+    confidence = -1.0
+    found_qty = False
+
+    # get highest confidence for qtys
+    object = {}
+    highest_confidence = 0.0
+    for obj in cv_result['customModelResult']['objectsResult']['values']:
+        for tag in obj['tags']:
+            if tag['confidence'] > highest_confidence and tag['name'] == 'qty':
+                highest_confidence = tag['confidence']
+                object = obj
+
+   # check if object was found
+    if object != {}:
+        for tag in object['tags']:
+            if tag['confidence'] >= min_qty_detection_confidence and tag['name'] == 'qty':
+                image = cv2.imread(input_image)                
+                x = object['boundingBox']['x']
+                y = object['boundingBox']['y']
+                w = object['boundingBox']['w']
+                h = object['boundingBox']['h']
+
+                roi_height = height_multiplier*h
+                roi_height = min(roi_height, roi_max_height)
+                cropped_qty = image[y+h:y+h+roi_height, x+side_border:x+w-side_border]
+              
+                confidence = tag['confidence']
+                found_qty = True
+
+    return cropped_qty, confidence, found_qty
+
 def crop_dates(input_image, cv_result):
 
     # cropping parameters
@@ -159,9 +201,9 @@ def crop_dates(input_image, cv_result):
     # initialize the cropped images
     cropped_dates = np.zeros((roi_max_height,roi_max_width,3),np.uint8)
     confidence = -1.0
-    found_charges = False
+    found_dates = False
 
-    # get highest confidence for charges
+    # get highest confidence for dates
     object = {}
     highest_confidence = 0.0
     for obj in cv_result['customModelResult']['objectsResult']['values']:
@@ -185,9 +227,11 @@ def crop_dates(input_image, cv_result):
                 cropped_dates = image[y+h:y+h+roi_height, x+side_border:x+w-side_border]
               
                 confidence = tag['confidence']
-                found_charges = True
+                found_dates = True
 
-    return cropped_dates, confidence, found_charges
+    return cropped_dates, confidence, found_dates
+
+
 
 # -----------------------------
 #   CURRENTLY NOT IN USE
