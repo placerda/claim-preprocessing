@@ -47,7 +47,12 @@ def extract_charges(text):
         text = re.sub(r"[^0-9]", "", text)
         formatted_text = '0.' + text
     return formatted_text
-    
+
+def extract_qty(text):
+    # keep only numbers and
+    text = re.sub(r"[^0-9]", "", text)
+    return text
+
 def is_valid_date(date_string, max_years_old=5):
     try:
         date = datetime.strptime(date_string, '%m/%d/%Y')
@@ -128,11 +133,10 @@ def llm_extract_date(text):
             generated_date = generated_date[:-4] + generated_date[-2:]
     return generated_date
 
-def count_words_in_line(words, line_number, line_threshold):
+def count_words_in_line(words, line_number, line_threshold=5):
     word_count = 0
     previous_top = 0
     current_line = -1
-    line_threshold = 5 # adjust this value to fit your needs
     for word in words:
         top = word['polygon'][1]
         if abs(top - previous_top) > line_threshold:

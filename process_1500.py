@@ -1,6 +1,6 @@
 from util.utils import load_image, get_filename
-from util.pre_processing import remove_blobs, remove_hlines, crop_dates, crop_charges, crop_total_charges
-from util.post_processing import extract_charges, sort_words, count_words_in_line
+from util.pre_processing import remove_blobs, remove_hlines, crop_qty, crop_dates, crop_charges, crop_total_charges
+from util.post_processing import extract_charges, sort_words, count_words_in_line, extract_qty
 from util.computervision_api import object_detection_rest
 from util.formrec_api import analyze_document_rest
 import cv2
@@ -60,6 +60,13 @@ def process_forms(files=None):
             'charges_4': '',
             'charges_5': '',
             'charges_6': '',
+            'qty_1': '', 
+            'qty_2': '', 
+            'qty_3': '',
+            'qty_4': '',
+            'qty_5': '',
+            'qty_6': '',            
+            'total_charges': '',
             'start_date_1': '', 
             'start_date_2': '', 
             'start_date_3': '',
@@ -71,8 +78,7 @@ def process_forms(files=None):
             'end_date_3': '',
             'end_date_4': '',
             'end_date_5': '',
-            'end_date_6': '',                        
-            'total_charges': ''
+            'end_date_6': ''
         }
 
         ###############################
@@ -126,7 +132,7 @@ def process_forms(files=None):
         for word in words:  
             word_count += 1
             top = word['polygon'][1] # top
-            if abs(top - previous_top) > line_threshold and line_number < 6:
+            if abs(top - previous_top) > line_threshold and line_number < 7:
                 if previous_top > 0:
                     charge = extract_charges(buffer)
                     if len(charge) > 3:
@@ -138,7 +144,6 @@ def process_forms(files=None):
             word_content = word['content']
             word_position += 1
             previous_top = top
-
 
             # post-processing to remove 1's that are actually pipes (review)
             words_in_line = count_words_in_line(words, line_number, line_threshold)
@@ -155,7 +160,7 @@ def process_forms(files=None):
             if word_count == len(words): # last word
                 line_number += 1
                 charge = extract_charges(buffer)
-                if line_number < 6 and len(charge) > 3:
+                if line_number < 7 and len(charge) > 3:
                     record[f'charges_{line_number}'] = charge
                     logging.info(f'charges_{line_number} ({round(confidence,2)})  = {charge}')
 
@@ -284,12 +289,12 @@ def process_forms(files=None):
         words = sort_words(words, line_threshold)
 
         words =  [word for word in words if len([char for char in word['content'] if char.isdigit()]) >= 2]
-        # words = [{'content': ''.join([char for char in word['content'] if char.isdigit()])} for word in words]
 
         for word in words:
             word_count += 1
+            word_content = ''.join([char for char in word['content'] if char.isdigit()])
 
-            if len(word['content']) > 1 and len(word['content']) <= 8 and count_digits(word['content']) >= 2:
+            if len(word_content) > 1 and len(word_content) <= 8 and count_digits(word_content) >= 2:
                 top = word['polygon'][1] # top
                 if abs(top - previous_top) > line_threshold and line_number < 7:
                     if previous_top > 0:
@@ -307,9 +312,6 @@ def process_forms(files=None):
                         start_date=''
                         end_date=''
 
-                word_content = word['content']
-                word_content = ''.join(char for char in word_content if char.isdigit())
-
                 word_position += 1
                 previous_top = top
 
@@ -320,10 +322,8 @@ def process_forms(files=None):
                         word_content = word_content[1:]
                     elif word_content[-1] == '1':    
                         word_content = word_content[:-1]
-                
-                # buffer += word_content
 
-                if len(start_date) < 6 or (len(end_date) == 4 and len(word_content) == 4):
+                if len(start_date) < 6:
                     start_date = start_date +  word_content
                 else:
                     end_date = end_date + word_content
@@ -343,12 +343,68 @@ def process_forms(files=None):
         ###############################
         # extract qty
         ###############################
-        # TODO
+
+        # crop qty
+        cropped_qty, confidence, found_qty = crop_qty(input_filename, object_detection_result) # type: ignore
+        if not found_qty:
+            logging.info(f"Could not detect qty. Confidence: {confidence}")
+            results.append(record)
+
+        cropped_qty = cv2.cvtColor(cropped_qty, cv2.COLOR_BGR2GRAY)
+        cropped_filename = get_filename(prefix, "cropped_qty")
+        cv2.imwrite(cropped_filename, cropped_qty)
+
+        cleaned_qty = remove_blobs(cropped_qty, 40)
+        cleaned_qty = remove_hlines(cleaned_qty)
+        cleaned_qty = remove_blobs(cleaned_qty, 10)
+        cleaned_qty = remove_hlines(cleaned_qty)
+
+        qty_cleaned_filename = get_filename(prefix, "qty_cleaned" )
+        cv2.imwrite(qty_cleaned_filename, cleaned_qty) 
+
+        fr_result = analyze_document_rest(qty_cleaned_filename, "prebuilt-read")  # features=['ocr.highResolution']
+        line_threshold = 25
+        max_distance_between_qty = 200
+        first_page = fr_result['pages'][0]
+        line_number = 0
+        word_position = 0
+        previous_top = 0
+        word_count = 0
+        buffer = ''
+        # read words
+        words = first_page['words']
+        words = sort_words(words, line_threshold)
+        for word in words:  
+            word_count += 1
+            top = word['polygon'][1] # top
+            if abs(top - previous_top) > line_threshold and line_number < 7:
+                if previous_top > 0:
+                    qty = extract_qty(buffer)
+                    if len(qty) > 0:
+                        line_number += 1
+                        record[f'qty_{line_number}'] = qty
+                        logging.info(f'qty_{line_number} ({round(confidence,2)}) = {qty}')
+                    word_position = 0                
+                    buffer = ''
+            word_content = word['content']
+            word_position += 1
+            previous_top = top
+
+            if word_position == 1:
+                buffer += word_content
+                
+            if word_count == len(words): # last word
+                line_number += 1
+                qty = extract_qty(buffer)
+                if line_number < 7 and len(qty) > 0:
+                    record[f'qty_{line_number}'] = qty
+                    logging.info(f'qty_{line_number} ({round(confidence,2)}) = {qty}')
 
         ###############################
         # extract birth date
         ###############################
         # TODO
+
 
         results.append(record)
             
@@ -360,6 +416,7 @@ def process_forms(files=None):
 
         # assuming you have a list of dictionaries called `results`
         header = ['fileName', 'charges_1', 'charges_2', 'charges_3', 'charges_4', 'charges_5', 'charges_6', 'total_charges',
+                  'qty_1', 'qty_2', 'qty_3', 'qty_4', 'qty_5', 'qty_6',
                   'start_date_1', 'start_date_2','start_date_3','start_date_4', 'start_date_5', 'start_date_6', 'end_date_1',
                   'end_date_2', 'end_date_3', 'end_date_4', 'end_date_5', 'end_date_6']
 
