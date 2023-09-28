@@ -1,8 +1,7 @@
 import re
 import string
 from datetime import datetime, timedelta
-from util.openai_api import complete
-from util.utils import count_digits
+from util.general import count_digits
 
 def remove_non_alphanumeric(text):
     pattern = r'[^a-zA-Z0-9\s]+'
@@ -32,21 +31,6 @@ def extract_cpthcpccode(text):
         return match.group()
     else:
         return ""
-
-def extract_charges(text):
-    formatted_text = ''
-    if len(text) >= 3:
-        # keep only numbers and
-        text = re.sub(r"[^0-9]", "", text)
-        # put in format 0.00
-        if len(text) == 2:
-            formatted_text = '0.' + text
-        else:
-            formatted_text = text[:-2] + '.' + text[-2:]
-    elif len(text) == 2:
-        text = re.sub(r"[^0-9]", "", text)
-        formatted_text = '0.' + text
-    return formatted_text
 
 def extract_qty(text):
     # keep only numbers and
@@ -116,29 +100,13 @@ def extract_date(text):
 
     return text
 
-
-def llm_extract_date(text):
-    prompt_filename = "prompts/date_inference.txt"
-    generated_date = complete(prompt_filename, text).strip()
-    # keep only numbers and /
-    pattern = r"[0-9/]+"
-    matches = re.findall(pattern, generated_date)
-    generated_date =  "".join(matches)
-    if generated_date == "":
-        generated_date = "could not infer"
-    else:
-        if count_digits(generated_date) == 8 and count_digits(text) == 6:
-            # force year to two digits when the input has only 6 digits
-            # prompt instruction to keep input format is not working
-            generated_date = generated_date[:-4] + generated_date[-2:]
-    return generated_date
-
 def count_words_in_line(words, line_number, line_threshold=5):
     word_count = 0
-    previous_top = 0
-    current_line = -1
+    previous_top = -1
+    current_line = 1
     for word in words:
         top = word['polygon'][1]
+        previous_top = top if previous_top == -1 else previous_top
         if abs(top - previous_top) > line_threshold:
             if current_line == line_number:
                 return word_count            
