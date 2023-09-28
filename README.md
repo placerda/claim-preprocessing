@@ -1,4 +1,4 @@
-# Doc Intelligence for Insurance Claim Forms
+# Doc Intelligence for Insurance Forms
 
 ### Scripts
 
