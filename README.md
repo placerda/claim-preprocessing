@@ -22,6 +22,6 @@ Example:
 
 #### Custom Vision Model
 
-The script will use an Azure Computer Vision custom model to detect objects and crop the image to a Region of Interest before sending to Document Intelligence.
+The script will use an Azure Computer Vision custom model to detect objects and crop specific regions for each field before sending to Document Intelligence. Cropping will be based on the configuration defined in the specific form yaml file. 
 
-[1500 claim form](./1500.config.yaml), for example, requires a custom object detection model trained to detect **charges**, **totacharges**, **datesofservice**, **qty** and **birthdate** objects.
+[1500 claim form](./1500.config.yaml), for example, configures 1500 forms extraction and requires a custom object detection model trained to detect **charges**, **totacharges**, **datesofservice**, **qty** and **birthdate** labels.
