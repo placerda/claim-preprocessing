@@ -5,7 +5,7 @@
 import cv2
 import numpy as np
 import imutils
-from util.utils import load_image
+from util.general import load_image
 
 # -----------------------------
 #   FUNCTIONS
@@ -58,94 +58,52 @@ def remove_hlines(image):
 # -------------------------------------
 #   Cropping Regions of Interest for each field
 # -------------------------------------
-
-def crop_charges(input_image, cv_result):
-
+def crop(input_image, cv_result, config):
+    
     # cropping parameters
-    roi_max_height = 400
-    roi_max_width = 400
-    side_border = 7 # pixels
-    height_multiplier = 10
-    min_charges_detection_confidence = 0.7
+    roi_max_height = config['max_height']
+    roi_max_width = config['max_width']
+    side_border = config["side_border"] # pixels
+    height_multiplier = config["height_multiplier"]
+    width_multiplier = config["width_multiplier"]    
+    detection_threshold = config["detection_threshold"]
+    x_offset = config["x_offset"]
+    y_offset = config["y_offset"]    
 
     # initialize the cropped images
-    cropped_charges = np.zeros((roi_max_width,roi_max_width,3),np.uint8)
+    cropped = np.zeros((roi_max_width,roi_max_width,3),np.uint8)
     confidence = -1.0
-    found_charges = False
-
-    # get highest confidence for charges
+    found = False
+    
+    # get highest confidence area
     object = {}
     highest_confidence = 0.0
     for obj in cv_result['customModelResult']['objectsResult']['values']:
         for tag in obj['tags']:
-            if tag['confidence'] > highest_confidence and tag['name'] == 'charges':
+            if tag['confidence'] > highest_confidence and tag['name'] == config['label']:
                 highest_confidence = tag['confidence']
                 object = obj
 
    # check if object was found
     if object != {}:
         for tag in object['tags']:
-            if tag['confidence'] >= min_charges_detection_confidence and tag['name'] == 'charges':
-                image = cv2.imread(input_image)                
-                x = object['boundingBox']['x']
-                y = object['boundingBox']['y']
-                w = object['boundingBox']['w']
-                h = object['boundingBox']['h']
-
-                roi_height = height_multiplier*h
-                roi_height = min(roi_height, roi_max_height)
-                cropped_charges = image[y+h:y+h+roi_height, x+side_border:x+w-side_border]
-              
+            if tag['confidence'] >= detection_threshold and tag['name'] == config['label']:
                 confidence = tag['confidence']
-                found_charges = True
-
-    return cropped_charges, confidence, found_charges
-
-def crop_total_charges(input_image, cv_result):
-
-    # cropping parameters
-    roi_max_height = 400
-    roi_max_width = 400
-    side_border = 1 # pixels
-    height_multiplier = 4.5
-    width_multiplier= 1.3
-    min_total_charges_detection_confidence = 0.20
-
-    # initialize the cropped images
-    cropped_charges = np.zeros((roi_max_height,roi_max_width,3),np.uint8)
-    cropped_charges[:,:] = (255,255,255)
-    confidence = -1.0
-    found_charges = False
-
-    # get highest confidence for total charges
-    object = {}
-    highest_confidence = 0.0
-    for obj in cv_result['customModelResult']['objectsResult']['values']:
-        for tag in obj['tags']:
-            if tag['confidence'] > highest_confidence and tag['name'] == 'totacharges':
-                highest_confidence = tag['confidence']
-                object = obj
-    
-    # check if object was found
-    if object != {}:
-        for tag in object['tags']:
-            if tag['confidence'] >= min_total_charges_detection_confidence and tag['name'] == 'totacharges':
+                found = True
                 image = cv2.imread(input_image)
-                x = object['boundingBox']['x']
-                y = object['boundingBox']['y']
+
+                x = object['boundingBox']['x'] + x_offset
+                y = object['boundingBox']['y'] + y_offset
                 w = object['boundingBox']['w']
                 h = object['boundingBox']['h']
-
                 roi_height = int(height_multiplier*h)
+                roi_height = min(roi_height, roi_max_height)
                 roi_width = int(width_multiplier*w)
-                
-                crop = image[y+h:y+roi_height, x+side_border:x+roi_width]
-                cropped_charges[:crop.shape[0], :crop.shape[1]] = crop
-                
-                confidence = tag['confidence']
-                found_charges = True
+                roi_width = min(roi_width , roi_max_width)
 
-    return cropped_charges, confidence, found_charges
+                cropped = image[y+h+y_offset:y+h+y_offset+roi_height, x+side_border:x+roi_width-side_border-x_offset]
+
+    return cropped, confidence, found
 
 def crop_qty(input_image, cv_result):
 

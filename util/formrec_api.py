@@ -14,8 +14,7 @@ import json
 import time
 
 # globals
-# FORM_REC_API_VERSION = "2023-02-28-preview"
-FORM_REC_API_VERSION = "2023-07-31"
+# FORM_REC_API_VERSION = "2023-07-31" or "2023-02-28-preview"
 VISION_ENDPOINT=os.environ["VISION_ENDPOINT"]
 VISION_KEY = os.environ["VISION_KEY"]
 QR_CODE_MODEL_NAME = "qrcode01"
@@ -91,7 +90,7 @@ def get_base64_encoded_content(filepath):
     with open(filepath, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
 
-def analyze_document_rest(filepath, model, features=[]):
+def analyze_document_rest(filepath, model, api_version, features=[]):
     base64EncodedContent = get_base64_encoded_content(filepath)
 
     # Request headers
@@ -107,10 +106,10 @@ def analyze_document_rest(filepath, model, features=[]):
 
     # if user wants to get features
     if len(features) > 0:
-        features_str = ",".join(features) # TODO: review if this is the proper way to add a list of features to the parameters   
-        request_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}:analyze?api-version={FORM_REC_API_VERSION}&features={features_str}"
+        features_str = ",".join(features)    
+        request_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}:analyze?api-version={api_version}&features={features_str}"
     else:
-        request_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}:analyze?api-version={FORM_REC_API_VERSION}"
+        request_endpoint = f"{os.environ['FORM_RECOGNIZER_ENDPOINT']}formrecognizer/documentModels/{model}:analyze?api-version={api_version}"
     
     try:
         # Send request
