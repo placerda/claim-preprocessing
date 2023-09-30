@@ -1,5 +1,9 @@
 # Doc Intelligence for Insurance Forms
 
+### Architecture
+
+![Architecture Diagram](architecture.png)
+
 ### Scripts
 
 - process.py: extracts claim form fields values.
