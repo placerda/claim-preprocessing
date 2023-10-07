@@ -5,6 +5,7 @@ test_logs/
 work*/
 launch.json
 .vscode/
+changes.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

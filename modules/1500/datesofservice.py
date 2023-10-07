@@ -21,8 +21,8 @@ def run(field):
     # parameters
     confidence = field['cropping']['confidence']
     name = field['name']
-    max_distance_between_rows = 1.5
-    line_threshold = 0.2
+    max_distance_between_rows = 0.9
+    line_threshold = 0.06
 
     record = {}
 

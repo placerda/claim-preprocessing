@@ -19,7 +19,7 @@ def format_date(date_str):
 def run(field):
 
     record = {}
-    line_threshold = 0.2
+    line_threshold = 0.06
     word_count = 0
     buffer = ''
     birth_date = ''

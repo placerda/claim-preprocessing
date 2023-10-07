@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from PIL import Image
 from util.general import load_image, get_filename
-from util.pre_processing import crop
+from util.pre_processing import crop, remove_blobs, remove_hlines
 from util.computervision_api import object_detection_rest
 from util.formrec_api import analyze_document_rest
 from datetime import datetime
@@ -20,6 +20,8 @@ import yaml
 logging.basicConfig(level=logging.INFO)
 load_dotenv()
 VISION_MODEL = os.environ.get("VISION_MODEL")
+PAGE_WIDTH=1700
+PAGE_HEIGHT=2256
 
 def main(config_file, files=None):
     
@@ -69,7 +71,7 @@ def main(config_file, files=None):
                 header.append(field_name)
 
         # read input file
-        input = load_image(image_file, prefix, prefix='input', width=1700)
+        input = load_image(image_file, prefix, prefix='input', width=PAGE_WIDTH)
         # looking only at the first page
         input_filename = get_filename(prefix+'_'+image_file.split('/')[-1].split('.')[0], "input")
         cv2.imwrite(input_filename, input)
@@ -88,39 +90,45 @@ def main(config_file, files=None):
 
             # Cropping
             cropped, confidence, found = crop(input_filename, object_detection_result, field['cropping'])
-            field['cropping']['roi'] = cropped
             field['cropping']['confidence'] = confidence
             field['cropping']['found'] = found
             if not found:
                 logging.info(f"Could not detect {field['name']}. Confidence: {confidence}")
             cropped = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+
+            # Remove noise
+            if field['remove_noise']:
+                cropped = remove_blobs(cropped, 40)
+                cropped = remove_hlines(cropped)
+                cropped = remove_blobs(cropped, 10)
+                cropped = remove_hlines(cropped)
+                
+            # Add white border to cropped image
+            border_size = 10
+            cropped = cv2.copyMakeBorder(cropped, border_size, border_size, border_size, border_size, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+            field['cropping']['roi'] = cropped
+
             cropped_filename = get_filename(prefix, f"cropped_{field['name']}")
             cv2.imwrite(cropped_filename, cropped)
             field['cropping']['filename'] = cropped_filename
-
 
         # Save cropped images to combined pdf
 
         images = []
         page_number = 1
         for field in fields:
-            jpeg_filename = field['cropping']['filename']
-            image = Image.open(jpeg_filename)
-            if image.mode != "RGB":
-                image = image.convert("RGB")
-            images.append(image)
+            images.append(Image.fromarray(field['cropping']['roi']))
             field['cropping']['page_number'] = page_number
-
-            combined_file = f"{work_dir}/{prefix}-combined.pdf"
-            # Save the first image in the list as a pdf file and append the rest
-            images[0].save(combined_file, save_all=True, append_images=images[1:])
             page_number += 1
+        combined_file = f"{work_dir}/{prefix}-combined.pdf"       
+        with open(combined_file, "wb") as pdf_file:
+            images[0].save(pdf_file, "PDF", save_all=True, append_images=images[1:], resolution=200, optimize=True, quality=100)
 
         #####################
         # Document Analysis
         #####################
         
-        fr_result = analyze_document_rest(combined_file, config['document_analysis']['model'], config['document_analysis']['api_version']) # , ['ocr.highResolution']
+        fr_result = analyze_document_rest(combined_file, config['document_analysis']['model'], config['document_analysis']['api_version'], []) # , ['ocr.highResolution']
 
         #####################
         # Postprocessing 
