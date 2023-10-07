@@ -7,6 +7,7 @@ document_analysis:
 fields:
   - name: "total_charges"
     cardinality: 1
+    remove_noise: true
     cropping:
       label: "totacharges"
       x_offset: 0
@@ -21,6 +22,7 @@ fields:
       module: "1500.total_charges"
   - name: "charges"
     cardinality: 6
+    remove_noise: true    
     cropping:
       label: "charges"
       x_offset: 0
@@ -35,6 +37,7 @@ fields:
       module: "1500.charges"
   - name: "qty"
     cardinality: 6
+    remove_noise: true    
     cropping:
       label: "qty"
       x_offset: 0
@@ -42,13 +45,14 @@ fields:
       side_border: 7
       height_multiplier: 10
       width_multiplier: 1
-      detection_threshold: 0.55
+      detection_threshold: 0.4
       max_height: 390
       max_width: 400
     postprocessing:
       module: "1500.qty"     
   - name: "start_date"
     cardinality: 6
+    remove_noise: true    
     cropping:
       label: "datesofservice"
       x_offset: 0
@@ -63,6 +67,7 @@ fields:
       module: "1500.datesofservice"
   - name: "end_date"
     cardinality: 6
+    remove_noise: true    
     cropping:
       label: "datesofservice"
       x_offset: 170
@@ -77,6 +82,7 @@ fields:
       module: "1500.datesofservice"
   - name: "birth_date"
     cardinality: 1
+    remove_noise: true    
     cropping:
       label: "birthdate"
       x_offset: 0
