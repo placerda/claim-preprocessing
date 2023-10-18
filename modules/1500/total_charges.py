@@ -40,12 +40,16 @@ def run(field):
         top = word['polygon'][1]
         distance_to_previous = abs(top - previous_top)
 
-        # remove 1 when it is a separator
+        # handle cases where the separator reads as 1
         words_in_line = count_words_in_line(words, 1, line_threshold)
-        # example: words = [$ 99 100 => $ 99 00]
+        # case 01: words = [$ 99 100 => $ 99 00]
         if words_in_line > 1 and word_position_in_row == words_in_line and len(word_content) == 3:
             if word_content.startswith('1'):
                 word_content = word_content[1:]
+        # case 02: words = [$ 99 001 => $ 99 00]
+        elif words_in_line > 1 and word_position_in_row == words_in_line and len(word_content) == 3:
+            if word_content.endswith('1'):
+                word_content = word_content[:-1]
 
         # for this field we're interested just in the first row
         if distance_to_previous < line_threshold or previous_top == 0:

@@ -63,7 +63,7 @@ def crop(input_image, cv_result, config):
     # cropping parameters
     roi_max_height = config['max_height']
     roi_max_width = config['max_width']
-    side_border = config["side_border"] # pixels
+    border = config["border"] # pixels
     height_multiplier = config["height_multiplier"]
     width_multiplier = config["width_multiplier"]    
     detection_threshold = config["detection_threshold"]
@@ -101,7 +101,7 @@ def crop(input_image, cv_result, config):
                 roi_width = int(width_multiplier*w)
                 roi_width = min(roi_width , roi_max_width)
 
-                cropped = image[y+h+y_offset:y+h+y_offset+roi_height, x+side_border:x+roi_width-side_border-x_offset]
+                cropped = image[y+h+y_offset:y+h+y_offset+roi_height, x+border:x+roi_width-border-x_offset]
 
     return cropped, confidence, found
 
@@ -110,7 +110,7 @@ def crop_qty(input_image, cv_result):
     # cropping parameters
     roi_max_height = 390
     roi_max_width = 400
-    side_border = 7 # pixels
+    border = 7 # pixels
     height_multiplier = 10
     min_qty_detection_confidence = 0.7
 
@@ -140,7 +140,7 @@ def crop_qty(input_image, cv_result):
 
                 roi_height = height_multiplier*h
                 roi_height = min(roi_height, roi_max_height)
-                cropped_qty = image[y+h:y+h+roi_height, x+side_border:x+w-side_border]
+                cropped_qty = image[y+h:y+h+roi_height, x+border:x+w-border]
               
                 confidence = tag['confidence']
                 found_qty = True
@@ -152,7 +152,7 @@ def crop_dates(input_image, cv_result):
     # cropping parameters
     roi_max_height = 390
     roi_max_width = 400
-    side_border = 7 # pixels
+    border = 7 # pixels
     height_multiplier = 10
     min_dates_detection_confidence = 0.7
 
@@ -182,7 +182,7 @@ def crop_dates(input_image, cv_result):
 
                 roi_height = height_multiplier*h
                 roi_height = min(roi_height, roi_max_height)
-                cropped_dates = image[y+h:y+h+roi_height, x+side_border:x+w-side_border]
+                cropped_dates = image[y+h:y+h+roi_height, x+border:x+w-border]
               
                 confidence = tag['confidence']
                 found_dates = True

@@ -10,7 +10,6 @@ def extract_qty(text):
     text = re.sub(r"[^0-9]", "", text)
     return text
 
-
 def run(field):
     
     # parameters
@@ -18,6 +17,7 @@ def run(field):
     word_position_in_row = 0
     max_distance_between_rows = 0.9
     line_threshold = 0.06
+    min_word_height = 0.05
 
     # initialize variables
     record = {}
@@ -37,9 +37,10 @@ def run(field):
         top = word['polygon'][1] # top
         distance_to_previous = abs(top - previous_top)
         distance_to_last_record = abs(top - last_record_top)  
+        word_height = word['polygon'][5]-word['polygon'][3]
 
         # process row
-        if (distance_to_previous > line_threshold and  previous_top > 0 and line_number < 7): 
+        if (distance_to_previous > line_threshold and  previous_top > 0 and word_height >= min_word_height and line_number < 7): 
             buffer = extract_qty(buffer)
             if len(buffer) > 0:
                 record[f'qty_{line_number}'] = buffer
@@ -63,7 +64,7 @@ def run(field):
         previous_top = top     
             
         # process last row
-        if (word_count == len(words) and line_number < 7): 
+        if (word_count == len(words) and word_height >= min_word_height and line_number < 7): 
             buffer = extract_qty(buffer)
             if len(buffer) > 0:
                 record[f'qty_{line_number}'] = buffer
