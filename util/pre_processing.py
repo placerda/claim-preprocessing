@@ -90,7 +90,8 @@ def crop(input_image, cv_result, config):
             if tag['confidence'] >= detection_threshold and tag['name'] == config['label']:
                 confidence = tag['confidence']
                 found = True
-                image = cv2.imread(input_image)
+                # image = cv2.imread(input_image)
+                image = input_image                
 
                 x = object['boundingBox']['x'] + x_offset
                 y = object['boundingBox']['y'] + y_offset

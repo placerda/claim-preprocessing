@@ -10,6 +10,7 @@ import argparse
 import cv2
 import csv
 import importlib
+import io
 import os
 import logging
 import numpy as np
@@ -20,6 +21,8 @@ import yaml
 logging.basicConfig(level=logging.INFO)
 load_dotenv()
 VISION_MODEL = os.environ.get("VISION_MODEL")
+DEBUG_MODE = os.environ.get("DEBUG_MODE") or 'true'
+debug_mode = True if DEBUG_MODE.lower() == 'true' else False
 PAGE_WIDTH=1700
 PAGE_HEIGHT=2256
 
@@ -71,25 +74,32 @@ def main(config_file, files=None):
                 header.append(field_name)
 
         # read input file
-        input = load_image(image_file, prefix, prefix='input', width=PAGE_WIDTH)
-        # looking only at the first page
+        input_image = load_image(image_file, prefix, prefix='input', width=PAGE_WIDTH)
         input_filename = get_filename(prefix+'_'+image_file.split('/')[-1].split('.')[0], "input")
-        cv2.imwrite(input_filename, input)
+        
+        # remove this later to not break while developing
+        cv2.imwrite(input_filename, input_image) 
+        # remove this later to not break while developing
+
+        if debug_mode: 
+            input_bytes = open(input_filename, "rb").read()
+        else:
+            success, encoded_image = cv2.imencode('.jpg', input_image)
+            input_bytes = encoded_image.tobytes()
 
         ##########################
         # Preprocessing
         ##########################
 
         # Detection
-        
-        object_detection_result = object_detection_rest(input_filename, VISION_MODEL)
+        object_detection_result = object_detection_rest(input_bytes, VISION_MODEL)
 
         fields = config['fields']
 
         for field in fields:
 
             # Cropping
-            cropped, confidence, found = crop(input_filename, object_detection_result, field['cropping'])
+            cropped, confidence, found = crop(input_image, object_detection_result, field['cropping'])
             field['cropping']['confidence'] = confidence
             field['cropping']['found'] = found
             if not found:
@@ -108,9 +118,16 @@ def main(config_file, files=None):
             cropped = cv2.copyMakeBorder(cropped, border_size, border_size, border_size, border_size, cv2.BORDER_CONSTANT, value=[255, 255, 255])
             field['cropping']['roi'] = cropped
 
+            if debug_mode: 
+                cropped_filename = get_filename(prefix, f"cropped_{field['name']}")
+                cv2.imwrite(cropped_filename, cropped)
+                field['cropping']['filename'] = cropped_filename
+
+            # remove this later to not break while developing
             cropped_filename = get_filename(prefix, f"cropped_{field['name']}")
             cv2.imwrite(cropped_filename, cropped)
             field['cropping']['filename'] = cropped_filename
+            # remove this later to not break while developing
 
         # Save cropped images to combined pdf
 
@@ -120,9 +137,12 @@ def main(config_file, files=None):
             images.append(Image.fromarray(field['cropping']['roi']))
             field['cropping']['page_number'] = page_number
             page_number += 1
-        combined_file = f"{work_dir}/{prefix}-combined.pdf"       
+        combined_file = f"{work_dir}/{prefix}-combined.pdf"
+        # combined_file = io.BytesIO() 
         with open(combined_file, "wb") as pdf_file:
             images[0].save(pdf_file, "PDF", save_all=True, append_images=images[1:], resolution=200, optimize=True, quality=100)
+        # reset file pointer to the beginning
+        # combined_file.seek(0)
 
         #####################
         # Document Analysis

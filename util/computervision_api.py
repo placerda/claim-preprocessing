@@ -23,15 +23,13 @@ CHARGES_MODEL_NAME = "charges01"
 
 ### Computer Vision Analysis
 
-def object_detection_rest(filepath, model):
+def object_detection_rest(image_data, model):
     
     # Request headers
     headers = {
         "Content-Type": "application/octet-stream",
         "Ocp-Apim-Subscription-Key": VISION_KEY
     }
-
-    image_data = open(filepath, "rb").read()
 
     request_endpoint = f"{VISION_ENDPOINT}computervision/imageanalysis:analyze?api-version=2023-02-01-preview&model-name={model}"
     
