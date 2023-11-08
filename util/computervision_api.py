@@ -24,7 +24,21 @@ CHARGES_MODEL_NAME = "charges01"
 ### Computer Vision Analysis
 
 def object_detection_rest(image_data, model):
-    
+    """
+    This function is responsible for object detection using REST API.
+
+    It sends an image to the API, which then returns the objects detected in the image.
+    Each object is represented by a bounding box and a label.
+
+    Parameters:
+    None
+
+    Returns:
+    A list of dictionaries. Each dictionary contains 'label' and 'bounding_box' keys.
+    'label' is a string that represents the object's name.
+    'bounding_box' is a dictionary with 'x', 'y', 'width', and 'height' keys that represent the object's location and size in the image.
+    """
+
     # Request headers
     headers = {
         "Content-Type": "application/octet-stream",

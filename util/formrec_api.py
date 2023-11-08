@@ -86,12 +86,18 @@ def get_document_words(document_path):
         result.append(bbox)
     return result
 
-def get_base64_encoded_content(filepath):
-    with open(filepath, "rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
+def get_base64_encoded_content(bytes):
+    return base64.b64encode(bytes).decode("utf-8")
 
-def analyze_document_rest(filepath, model, api_version, features=[]):
-    base64EncodedContent = get_base64_encoded_content(filepath)
+def get_base64_encoded_file_content(filepath):
+        input_bytes = open(filepath, "rb").read()
+        return get_base64_encoded_content(input_bytes)
+
+def analyze_document_rest(image_data, model, api_version, features=[]):
+
+    # Input used to be a file read as bytes before we changed to inmemory approach.
+    # base64EncodedContent = get_base64_encoded_content(image_data)
+    base64EncodedContent = get_base64_encoded_content(image_data)
 
     # Request headers
     headers = {

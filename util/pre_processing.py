@@ -27,6 +27,24 @@ def extract_roi(image_path, coord):
     return roi
 
 def remove_blobs(img, area_threshold):
+    """
+    This function removes small blobs from an image based on a specified area threshold.
+
+    Parameters:
+    img (numpy.ndarray): The input image from which blobs are to be removed. It should be in grayscale.
+    area_threshold (int): The area threshold value. All blobs in the image with an area less than this value will be removed.
+
+    Returns:
+    new_img (numpy.ndarray): The processed image with all blobs having an area less than the area_threshold removed.
+
+    The function works as follows:
+    - It first converts the input image to binary.
+    - It then finds all connected components (blobs) in the binary image.
+    - It removes all blobs that have an area less than the specified area_threshold.
+    - It creates a new binary image with only the large blobs.
+    - It converts the binary image back to grayscale.
+    - Finally, it inverts the image and returns it.
+    """    
     # convert image to binary
     _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     # Find connected components
@@ -45,6 +63,22 @@ def remove_blobs(img, area_threshold):
     return new_img
 
 def remove_hlines(image):
+    """
+    This function removes horizontal lines from an image.
+
+    Parameters:
+    image (numpy.ndarray): The input image from which horizontal lines are to be removed. It should be in BGR format.
+
+    Returns:
+    gray (numpy.ndarray): The processed grayscale image with horizontal lines removed.
+
+    The function works as follows:
+    - It first converts the input image to grayscale.
+    - It then converts the grayscale image to binary using adaptive thresholding.
+    - It applies a morphological open operation with a horizontal kernel to remove horizontal lines.
+    - It applies the binary mask to the grayscale image, setting the pixels where the mask is true to white.
+    - Finally, it returns the processed grayscale image.
+    """    
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     # convert image to binary
     binary = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 15, 2)
@@ -55,11 +89,24 @@ def remove_hlines(image):
     gray[binary > 0] = 255
     return gray
 
-# -------------------------------------
-#   Cropping Regions of Interest for each field
-# -------------------------------------
 def crop(input_image, cv_result, config):
-    
+    """
+    This function crops an image based on the highest confidence area detected by a custom model.
+
+    Parameters:
+        input_image (numpy.ndarray): The input image to be cropped.
+        cv_result (dict): The result from the custom model, which includes detected objects and their confidence scores.
+        config (dict): A configuration dictionary that includes parameters for cropping and object detection.
+
+    Returns:
+        cropped (numpy.ndarray): The cropped image.
+        confidence (float): The confidence score of the detected area that the image was cropped to.
+        found (bool): A boolean indicating whether a suitable area for cropping was found.
+
+    Raises:
+        Exception: If there is an error during the cropping operation.
+    """
+
     # cropping parameters
     roi_max_height = config['max_height']
     roi_max_width = config['max_width']

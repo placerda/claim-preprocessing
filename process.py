@@ -1,182 +1,215 @@
-from dotenv import load_dotenv
-from PIL import Image
-from util.general import load_image, get_filename
-from util.pre_processing import crop, remove_blobs, remove_hlines
-from util.computervision_api import object_detection_rest
-from util.formrec_api import analyze_document_rest
+# Python Standard Library Imports
+import argparse
+import csv
+import logging
+import os
 from datetime import datetime
 from glob import glob
-import argparse
+from io import BytesIO
+
+# Third Party Imports
 import cv2
-import csv
 import importlib
-import io
-import os
-import logging
+import imutils
 import numpy as np
-import os
 import yaml
+from dotenv import load_dotenv
+from pdf2image import convert_from_path
+from PIL import Image
 
-# logging levelF
-logging.basicConfig(level=logging.INFO)
+# Local Imports
+from util.computervision_api import object_detection_rest
+from util.formrec_api import analyze_document_rest
+from util.general import get_filename
+from util.pre_processing import crop, remove_blobs, remove_hlines
+
+# Constants
+LOGGING_LEVEL = logging.INFO
+VISION_MODEL_ENV_VAR = "VISION_MODEL"
+DEBUG_MODE_ENV_VAR = "DEBUG_MODE"
+DEBUG_MODE_DEFAULT = 'false'
+PAGE_WIDTH = 1700
+PAGE_HEIGHT = 2256
+WORK_DIR = 'work'
+DEFAULT_INPUT = 'data/*.pdf'
+
+# Configure Logging
+logging.basicConfig(level=LOGGING_LEVEL)
 load_dotenv()
-VISION_MODEL = os.environ.get("VISION_MODEL")
-DEBUG_MODE = os.environ.get("DEBUG_MODE") or 'true'
+
+VISION_MODEL = os.environ.get(VISION_MODEL_ENV_VAR)
+DEBUG_MODE = os.environ.get(DEBUG_MODE_ENV_VAR) or DEBUG_MODE_DEFAULT
 debug_mode = True if DEBUG_MODE.lower() == 'true' else False
-PAGE_WIDTH=1700
-PAGE_HEIGHT=2256
 
-def main(config_file, files=None):
-    
-    #####################
-    # Initialization
-    #####################
 
-    work_dir = 'work'
-    # define input
-
-    default_input = 'data/*.pdf'
+def get_files(files):
     if files is None:
-        files = glob(default_input)
+        return glob(DEFAULT_INPUT)
     elif files.endswith('.pdf'):
-        files = [files]
+        return [files]
     elif files.endswith('/'):
-        files = glob(f'{files}*.pdf')
+        return glob(f'{files}*.pdf')
     else:
-        files = glob(f'{files}/*.pdf')
-    
-    # load configuration
+        return glob(f'{files}/*.pdf')
+
+def load_config(config_file):
     with open(config_file, 'r') as f:
-        config = yaml.safe_load(f)
+        return yaml.safe_load(f)
+
+def process_forms(files, config):
+    """
+    This function processes forms based on the provided files and configuration.
+
+    Parameters:
+    files (list): A list of file paths to the forms that need to be processed.
+    config (dict): A dictionary containing configuration options for processing.
+
+    Returns:
+    None
+    """    
+    # create empty output file with header
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_file = os.path.join(WORK_DIR, f'{timestamp}.csv')
+    logging.info(f"### PROCESSING START ({output_file})")  
+        
+    header = ['fileName']
+    for field in config['fields']:
+        for i in range(1, field['cardinality']+1):
+            field_name = f"{field['name']}_{i}"
+            header.append(field_name)
+
+    if not os.path.exists(WORK_DIR): os.makedirs(WORK_DIR)
+    with open(output_file, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=header)
+        writer.writeheader()
+  
+    # Process each file
+    for idx, image_file in enumerate(files):
+        record = process_form(image_file, config)
+        with open(output_file, "a", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=header)
+                writer.writerow(record)
+
+    logging.info(f"### PROCESSING DONE ({output_file})")  
+
+def initialize_record(config, image_file):
+    record = {'fileName': image_file.split('/')[-1]}
+    for field in config['fields']:
+        for i in range(1, field['cardinality']+1):
+            field_name = f"{field['name']}_{i}"
+            record[field_name] = ''
+    return record
+
+def process_form(form_file, config):
+    """
+    This function processes a single form.
+
+    Parameters:
+    form (object): The form that needs to be processed.
+
+    Returns:
+    record with extracted field values
+    """
+    
+    logging.info(f"### PROCESSING FILE: {form_file}")
+
+    record = initialize_record(config, form_file)
+
+    # read input file
+    pages = convert_from_path(form_file, dpi=200, first_page=0, last_page=1)
+    image = np.array(pages[0])
+    input_image = imutils.resize(image, width=PAGE_WIDTH)
+
+    if debug_mode:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        input_filename = get_filename(timestamp+'_'+form_file.split('/')[-1].split('.')[0], "input")
+        cv2.imwrite(input_filename, input_image) 
+    
+    success, encoded_image = cv2.imencode('.jpg', input_image)
+    input_bytes = encoded_image.tobytes()
+
+    ##########################
+    # Preprocessing
+    ##########################
+
+    # Detection
+    object_detection_result = object_detection_rest(input_bytes, VISION_MODEL)
+
+    fields = config['fields']
+
+    for field in fields:
+
+        # Cropping
+        cropped, confidence, found = crop(input_image, object_detection_result, field['cropping'])
+        field['cropping']['confidence'] = confidence
+        field['cropping']['found'] = found
+        if not found:
+            logging.info(f"Could not detect {field['name']}. Confidence: {confidence}")
+        cropped = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+
+        # Remove noise
+        if field['remove_noise']:
+            cropped = remove_blobs(cropped, 40)
+            cropped = remove_hlines(cropped)
+            cropped = remove_blobs(cropped, 10)
+            cropped = remove_hlines(cropped)
+            
+        # Add white border to cropped image
+        border_size = 10
+        cropped = cv2.copyMakeBorder(cropped, border_size, border_size, border_size, border_size, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+        field['cropping']['roi'] = cropped
+
+        if debug_mode:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            cropped_filename = get_filename(timestamp, f"cropped_{field['name']}")
+            cv2.imwrite(cropped_filename, cropped)
+            field['cropping']['filename'] = cropped_filename
+
+    # Save cropped images to combined pdf
+    images = []
+    page_number = 1
+
+    for field in fields:
+        images.append(Image.fromarray(field['cropping']['roi']))
+        field['cropping']['page_number'] = page_number
+        page_number += 1
+    
+    buffer = BytesIO()
+    images[0].save(buffer, "PDF", save_all=True, append_images=images[1:], resolution=200, optimize=True, quality=100)
+    buffer.seek(0)
+    pdf_data = buffer.read()
+
+    #####################
+    # Document Analysis
+    #####################
+    
+    fr_result = analyze_document_rest(pdf_data, config['document_analysis']['model'], config['document_analysis']['api_version'], []) # , ['ocr.highResolution']
+
+    #####################
+    # Postprocessing 
+    #####################
+
+    for field in fields:
+        for page in fr_result['pages']:
+            if page['pageNumber'] == field['cropping']['page_number']:
+                field['analysis'] = {'words': page['words']} 
+                module = importlib.import_module("modules." + field['postprocessing']['module'])
+                post_process_result = module.run(field)
+                record = {**record, **post_process_result}
+                break
+
+    return record
+        
+def main(config_file, files=None):
+    files = get_files(files)
+    config = load_config(config_file)
 
     if len(files) == 0:
         logging.info(f"No files to process")
         exit(0)
 
-    #####################
-    # Process each file
-    #####################
+    process_forms(files, config)
 
-    for idx, image_file in enumerate(files):
-
-        results = []
-
-        prefix = datetime.now().strftime("%Y%m%d-%H%M%S")
-        logging.info(f"### PROCESSING FILE: {image_file} ({prefix})")
-
-        # initialize record with all fields values empty
-        record = {'fileName': image_file.split('/')[-1] }
-        header = ['fileName']
-        for field in config['fields']:
-            for i in range(1, field['cardinality']+1):
-                field_name = f"{field['name']}_{i}"
-                record[field_name] = ''
-                header.append(field_name)
-
-        # read input file
-        input_image = load_image(image_file, prefix, prefix='input', width=PAGE_WIDTH)
-        input_filename = get_filename(prefix+'_'+image_file.split('/')[-1].split('.')[0], "input")
-        
-        # remove this later to not break while developing
-        cv2.imwrite(input_filename, input_image) 
-        # remove this later to not break while developing
-
-        if debug_mode: 
-            input_bytes = open(input_filename, "rb").read()
-        else:
-            success, encoded_image = cv2.imencode('.jpg', input_image)
-            input_bytes = encoded_image.tobytes()
-
-        ##########################
-        # Preprocessing
-        ##########################
-
-        # Detection
-        object_detection_result = object_detection_rest(input_bytes, VISION_MODEL)
-
-        fields = config['fields']
-
-        for field in fields:
-
-            # Cropping
-            cropped, confidence, found = crop(input_image, object_detection_result, field['cropping'])
-            field['cropping']['confidence'] = confidence
-            field['cropping']['found'] = found
-            if not found:
-                logging.info(f"Could not detect {field['name']}. Confidence: {confidence}")
-            cropped = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
-
-            # Remove noise
-            if field['remove_noise']:
-                cropped = remove_blobs(cropped, 40)
-                cropped = remove_hlines(cropped)
-                cropped = remove_blobs(cropped, 10)
-                cropped = remove_hlines(cropped)
-                
-            # Add white border to cropped image
-            border_size = 10
-            cropped = cv2.copyMakeBorder(cropped, border_size, border_size, border_size, border_size, cv2.BORDER_CONSTANT, value=[255, 255, 255])
-            field['cropping']['roi'] = cropped
-
-            if debug_mode: 
-                cropped_filename = get_filename(prefix, f"cropped_{field['name']}")
-                cv2.imwrite(cropped_filename, cropped)
-                field['cropping']['filename'] = cropped_filename
-
-            # remove this later to not break while developing
-            cropped_filename = get_filename(prefix, f"cropped_{field['name']}")
-            cv2.imwrite(cropped_filename, cropped)
-            field['cropping']['filename'] = cropped_filename
-            # remove this later to not break while developing
-
-        # Save cropped images to combined pdf
-
-        images = []
-        page_number = 1
-        for field in fields:
-            images.append(Image.fromarray(field['cropping']['roi']))
-            field['cropping']['page_number'] = page_number
-            page_number += 1
-        combined_file = f"{work_dir}/{prefix}-combined.pdf"
-        # combined_file = io.BytesIO() 
-        with open(combined_file, "wb") as pdf_file:
-            images[0].save(pdf_file, "PDF", save_all=True, append_images=images[1:], resolution=200, optimize=True, quality=100)
-        # reset file pointer to the beginning
-        # combined_file.seek(0)
-
-        #####################
-        # Document Analysis
-        #####################
-        
-        fr_result = analyze_document_rest(combined_file, config['document_analysis']['model'], config['document_analysis']['api_version'], []) # , ['ocr.highResolution']
-
-        #####################
-        # Postprocessing 
-        #####################
-
-        for field in fields:
-            for page in fr_result['pages']:
-                if page['pageNumber'] == field['cropping']['page_number']:
-                    field['analysis'] = {'words': page['words']} 
-                    module = importlib.import_module("modules." + field['postprocessing']['module'])
-                    post_process_result = module.run(field)
-                    record = {**record, **post_process_result}
-                    break
-        results.append(record)
-
-        #####################
-        # Save results
-        #####################
-        
-        if len(results) > 0:
-            output_file = os.path.join(work_dir, f'{prefix}.csv')
-            with open(output_file, "w", newline="") as f:
-                writer = csv.DictWriter(f, fieldnames=header)
-                writer.writeheader()
-                for result in results:
-                    writer.writerow(result)
-            logging.info(f"Results file: {output_file}") 
-          
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Extract form fields.')
     parser.add_argument('-i', '--input', help='Folder where the pdfs are or a single pdf file.')
