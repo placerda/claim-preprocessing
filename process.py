@@ -58,14 +58,23 @@ def load_config(config_file):
 
 def process_forms(files, config):
     """
-    This function processes forms based on the provided files and configuration.
+    Processes a list of forms based on the provided configuration.
+
+    This function iterates over a list of form files, processes each form using the provided configuration, and writes the results to a CSV file. 
+    The CSV file is named with the current timestamp and stored in a predefined working directory.
 
     Parameters:
-    files (list): A list of file paths to the forms that need to be processed.
-    config (dict): A dictionary containing configuration options for processing.
+    files (list of str): A list of file paths to the forms that need to be processed.
+    config (dict): A dictionary containing configuration options for processing. 
+                    The 'fields' key should contain a list of dictionaries, each representing a field to be processed in the form. 
+                    Each field dictionary should have a 'name' key (the name of the field) and a 'cardinality' key (the number of times the field appears in the form).
 
     Returns:
     None
+
+    Raises:
+    - FileNotFoundError: If any of the form files in the list do not exist.
+    - KeyError: If the config dictionary does not contain the required keys.
     """    
     # create empty output file with header
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -102,15 +111,31 @@ def initialize_record(config, image_file):
 
 def process_form(form_file, config):
     """
-    This function processes a single form.
+    Processes a single form based on the provided configuration.
+
+    This function reads a form file, applies object detection to identify fields, crops the fields, removes noise, applies document analysis, and finally post-processes the results.
 
     Parameters:
-    form (object): The form that needs to be processed.
+    form_file (str): The path to the form file that needs to be processed.
+    config (dict): A dictionary containing configuration options for processing. The 'fields' key should contain a list of dictionaries, each representing a field to be processed in the form. Each field dictionary should have a 'name' key (the name of the field), a 'cropping' key (parameters for cropping the field), a 'remove_noise' key (a boolean indicating whether noise should be removed from the field), and a 'postprocessing' key (parameters for post-processing the field).
 
     Returns:
-    record with extracted field values
+    record (dict): A dictionary containing the extracted field values.
+
+    The function works as follows:
+    - It first initializes a record for the form.
+    - It then reads the form file and resizes the image.
+    - It applies object detection to the image.
+    - It iterates over each field in the config:
+        - It crops the field from the image.
+        - If the 'remove_noise' key is true, it removes noise from the field.
+        - It adds a white border to the cropped field.
+    - It saves the cropped fields to a combined PDF.
+    - It applies document analysis to the PDF.
+    - It post-processes the results of the document analysis.
+    - Finally, it returns the record with the extracted field values.
     """
-    
+
     logging.info(f"### PROCESSING FILE: {form_file}")
 
     record = initialize_record(config, form_file)
